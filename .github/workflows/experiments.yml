@@ -1,0 +1,31 @@
+name: Held-out controller evaluation
+on:
+  workflow_dispatch:
+    inputs:
+      episodes:
+        description: Rendered episodes per controller
+        default: '512'
+        type: string
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Run rendered evaluation and seeded policy search
+        env:
+          TACIT_EPISODES: ${{ inputs.episodes }}
+        run: npm run experiment -- --n "$TACIT_EPISODES" --stress 4096 --optimize
+      - uses: actions/upload-artifact@v4
+        with:
+          name: held-out-evidence
+          path: public/data
+          retention-days: 3
