@@ -67,7 +67,13 @@ export async function exportFixture(spec: FixtureSpec) {
     const notes = {
       version: 1,
       modelVersion: MODEL_VERSION,
-      fixture: spec,
+      fixture: {
+        ...spec,
+        // Older replay metadata called this opening 9 mm; exported CAD uses
+        // the current fixed solid, whose shared dimension source is 13 mm.
+        window: D.holder.windowWidth,
+        clearance: D.holder.seatClearance,
+      },
       units: "mm",
       dimensions: D.holder,
       volumeMm3: result.volume(),
