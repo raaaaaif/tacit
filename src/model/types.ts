@@ -25,6 +25,7 @@ export interface ScenarioSpec {
 }
 /** Never given to an observed controller. Only environment, renderer, and scorer consume truth. */
 export interface WorldState {
+  fixturePose?: Vec3;
   volume: number;
   initialVolume: number;
   pose: Vec3;
@@ -60,12 +61,14 @@ export interface Features {
   levelSigma: number;
   tubeX: number | null;
   tubeXSigma: number;
+  tubeY?: number | null;
   pelletAngle: number | null;
   pelletSigma: number;
   visiblePixels: number;
   quality: number;
 }
 export interface Particle {
+  levelBias?: number;
   volume: number;
   pose: Vec3;
   pelletAngle: number;
@@ -78,6 +81,7 @@ export interface BeliefState {
   observations: number;
   volume: [number, number];
   poseX: [number, number];
+  poseY: [number, number];
   pelletKnown: boolean;
   effectiveN: number;
 }

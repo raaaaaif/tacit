@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       episodes:
-        description: Rendered episodes per controller
+        description: Rendered episodes per primary comparison
         default: '512'
         type: string
 permissions:
@@ -11,7 +11,12 @@ permissions:
 jobs:
   evaluate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        controller: [nominal, estimate, belief, oracle]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,11 +24,35 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npm test
-      - name: Run rendered evaluation and seeded policy search
+      - name: Optimize, tune and evaluate the controller
         env:
           TACIT_EPISODES: ${{ inputs.episodes }}
-        run: npm run experiment -- --n "$TACIT_EPISODES" --stress 4096 --optimize
+          TACIT_CONTROLLER: ${{ matrix.controller }}
+        run: npm run experiment -- --n "$TACIT_EPISODES" --controller "$TACIT_CONTROLLER"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: controller-${{ matrix.controller }}
+          path: |
+            public/data/controller-*.json
+            public/data/episodes-*.csv
+          retention-days: 3
+  aggregate:
+    needs: evaluate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: controller-*
+          path: public/data
+          merge-multiple: true
+      - run: npx tsx scripts/aggregate.ts
       - uses: actions/upload-artifact@v4
         with:
           name: held-out-evidence

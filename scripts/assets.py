@@ -1,12 +1,12 @@
 """Author TACIT's original labware and workcell meshes. Run with Blender --background --python.
-All dimensions are mm in authoring coordinates; glTF exports use metres through scale 0.001.
+All coordinates are nominal millimetres. The workbench consumes glTF units as millimetres.
 Generated meshes are presentation assets. Collision geometry lives in the shared dimension model.
 """
-import bpy, math, json, pathlib
+import bpy, bmesh, math, json, pathlib
 from mathutils import Vector
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 D = json.loads((ROOT/'src/model/dimensions.json').read_text())
-OUT = ROOT/'public/assets'; OUT.mkdir(parents=True, exist_ok=True)
+OUT = ROOT/'src/assets'; OUT.mkdir(parents=True, exist_ok=True)
 bpy.ops.object.select_all(action='SELECT'); bpy.ops.object.delete(use_global=False)
 def mat(name, color, metallic=0, rough=.4, transmission=0):
     m=bpy.data.materials.new(name); m.diffuse_color=(*color,1);m.use_nodes=True
@@ -59,33 +59,38 @@ for z in [14,18,22,26,30]:
 export('tube',group_objects(before))
 # Fine tapered disposable tip and collet.
 before=set(o.name for o in bpy.context.scene.objects)
-tip=D['tip'];lathe('tip',[(0,.28),(46,3.1),(46,3.35),(50,3.35),(50,2.95),(46,2.87),(.35,.12),(0,.12),(0,.28)],poly)
-cyl('Pipette collet',(0,0,52.6),3.7,5.2,aluminum)
-cyl('Pipette head',(0,0,59),5.3,8,warm)
-lathe('Collet accent',[(54.8,5.35),(55.2,5.35)],amber)
+tip=D['tip'];lathe('tip',[(0,.28),(46,3.1),(46.3,3.7),(65,3.7),(65,3.45),(46.3,3.45),(46,2.87),(.35,.12),(0,.12),(0,.28)],poly)
+cyl('Pipette collet',(0,0,67.6),4.1,5.2,aluminum)
+cyl('Pipette head',(0,0,75),5.3,10,warm)
+lathe('Collet accent',[(70,5.35),(70.4,5.35)],amber)
 export('tip',group_objects(before))
-# Bench holder: open sightline, shoulder seats, a keyed collar.
-before=set(o.name for o in bpy.context.scene.objects)
-cube('Holder base',(0,0,-2.6),(34,28,3),slate,1.1)
-for side in [-1,1]:
-    cube('Support web',(side*9,0,6.5),(5,10,15),slate,.7)
-    cube('Shoulder support',(side*6,0,14),(5,10,3),slate,.5)
-    cyl('Mount fastener',(side*13,9,-.9),1.05,.25,aluminum)
-    cyl('Mount fastener',(side*13,-9,-.9),1.05,.25,aluminum)
-lathe('Keyed seating ring',[(14,5.45),(15.3,5.45),(15.6,6.4),(13.7,6.4),(14,5.45)],slate)
-cube('Orientation index',(0,6.5,15),(2,3,1.5),amber,.3)
-cube('Index tab',(0,-13,-.8),(6,1.4,.45),amber,.2)
-export('holder',group_objects(before))
+# The exact same watertight solid as the STL/3MF exports. Small bevels are visual only.
+for source in sorted((ROOT/'work/fixture-meshes').glob('holder-*.json')):
+    data=json.loads(source.read_text());stride=data['stride'];v=data['vertices'];tri=data['triangles']
+    mesh=bpy.data.meshes.new(source.stem)
+    mesh.from_pydata([v[i:i+3] for i in range(0,len(v),stride)],[],[tri[i:i+3] for i in range(0,len(tri),3)])
+    mesh.update();obj=bpy.data.objects.new(source.stem,mesh);bpy.context.collection.objects.link(obj);obj.data.materials.append(slate)
+    bm=bmesh.new();bm.from_mesh(mesh)
+    bmesh.ops.remove_doubles(bm,verts=list(bm.verts),dist=.0001)
+    bmesh.ops.dissolve_limit(bm,angle_limit=.005,verts=list(bm.verts),edges=list(bm.edges),use_dissolve_boundaries=False)
+    bm.to_mesh(mesh);bm.free();mesh.update()
+    bevel(obj,.45,4)
+    obj.modifiers['Machined edge radius'].use_clamp_overlap=True
+    details=[obj]
+    for side in [-1,1]:
+        for y in [-9,9]:details.append(cyl('Mount fastener',(side*13,y,-.95),1.05,.25,aluminum))
+    details.append(cube('Index tab',(0,-13,-.85),(6,1.4,.4),amber,.18))
+    export(source.stem,details)
 # Restrained instrument platform and an actual linear stage.
 before=set(o.name for o in bpy.context.scene.objects)
 cube('Instrument plinth',(0,1,-6.0),(72,66,5.5),warm,2)
 cube('Isolation layer',(0,1,-9.0),(69,63,1.2),black,.6)
 for x in [-26,26]:
     for y in [-23,25]:cyl('Isolation foot',(x,y,-10),4.0,2,black)
-cube('Stage spine',(22,24,32),(11,10,80),aluminum,1.3)
-cube('Stage guide dark inset',(22,18.7,32),(5,.8,67),black,.25)
-for x in [19,25]:cyl('Linear rail',(x,18.0,33),.75,69,aluminum)
-for z in [1,64]:
+cube('Stage spine',(22,24,74),(11,10,160),aluminum,1.3)
+cube('Stage guide dark inset',(22,18.7,76),(5,.8,144),black,.25)
+for x in [19,25]:cyl('Linear rail',(x,18.0,76),.75,146,aluminum)
+for z in [6,147]:
     o=cyl('Rail fastener',(22,18.1,z),1.2,.35,black);o.rotation_euler[0]=math.pi/2
 cube('Calibration tile',(-23,-18,-3.1),(10,10,.18),slate,.3)
 for i in range(3):

@@ -9,7 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "tsx --test tests/*.test.ts",
     "experiment": "tsx scripts/experiment.ts",
-    "assets": "blender --background --python scripts/assets.py",
+    "assets": "tsx scripts/fixture-meshes.ts && node scripts/run-blender.mjs",
     "check:budget": "node scripts/budget.mjs"
   },
   "dependencies": {

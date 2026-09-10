@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import tubeURL from "../assets/tube.glb?url";
+import tipURL from "../assets/tip.glb?url";
+import workcellURL from "../assets/workcell.glb?url";
+const holderURLs = import.meta.glob("../assets/holder-*.glb", {
+  query: "?url",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -9,11 +18,14 @@ import {
   liquidHeight,
   pelletPosition,
   toWorld,
+  displacedTipVolume,
 } from "../model/geometry";
 import type { WorldState, Vec3 } from "../model/types";
 interface Props {
   world: WorldState;
+  overview: boolean;
   tip: Vec3;
+  aspirated: number;
   cutaway: boolean;
   showBelief: boolean;
   reset: number;
@@ -40,7 +52,7 @@ function fluidMesh(height: number, tilt: number) {
               D.tube.coneHeight) *
               Math.cos(a));
       const z = (surface * j) / m,
-        r = innerRadius(z) * 0.98;
+        r = innerRadius(z);
       positions.push(r * Math.cos(a), z, -r * Math.sin(a));
     }
   }
@@ -92,12 +104,17 @@ export function Workbench(props: Props) {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = false;
     controls.minDistance = 60;
-    controls.maxDistance = 210;
+    controls.maxDistance = 420;
     controls.maxPolarAngle = Math.PI * 0.49;
     controls.target.set(0, 15, 0);
     const reset = () => {
-      camera.position.set(67, 64, 95);
-      controls.target.set(0, 15, 0);
+      if (latest.current.overview) {
+        camera.position.set(190, 200, 290);
+        controls.target.set(0, 75, 0);
+      } else {
+        camera.position.set(67, 64, 95);
+        controls.target.set(0, 15, 0);
+      }
       controls.update();
       request();
     };
@@ -140,7 +157,7 @@ export function Workbench(props: Props) {
     const fluid = new THREE.Mesh(
       fluidMesh(20, 0),
       new THREE.MeshPhysicalMaterial({
-        color: 0xa9b9a6,
+        color: 0x8aab99,
         roughness: 0.16,
         metalness: 0.02,
         transparent: true,
@@ -153,7 +170,7 @@ export function Workbench(props: Props) {
     const meniscus = new THREE.Mesh(
       new THREE.CircleGeometry(4.3, 80),
       new THREE.MeshPhysicalMaterial({
-        color: 0xc0d0b8,
+        color: 0x96b09e,
         roughness: 0.12,
         metalness: 0.08,
         transparent: true,
@@ -190,39 +207,50 @@ export function Workbench(props: Props) {
       }),
     );
     scene.add(uncertainty);
-    const pathMaterial = new THREE.LineDashedMaterial({
-      color: 0x7b8f80,
-      dashSize: 0.65,
-      gapSize: 0.45,
-      transparent: true,
-      opacity: 0.75,
+    // Mechanically connected X/Y carriages on a vertical Z rail.
+    const metal = new THREE.MeshStandardMaterial({
+      color: 0x89978e,
+      metalness: 0.72,
+      roughness: 0.3,
     });
-    const path = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([
-        point([0, -1.35, 4]),
-        point([0, -1.35, 41]),
-      ]),
-      pathMaterial,
-    );
-    path.computeLineDistances();
-    scene.add(path);
-    const carriage = new THREE.Mesh(
-      new THREE.BoxGeometry(23, 6, 9),
-      new THREE.MeshStandardMaterial({
-        color: 0xa8afa7,
-        metalness: 0.7,
-        roughness: 0.3,
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x29392f,
+      metalness: 0.4,
+      roughness: 0.38,
+    });
+    const railMesh = (size: number[], material: THREE.Material) => {
+      const mesh = new THREE.Mesh(
+        new RoundedBoxGeometry(size[0], size[1], size[2], 2, 0.3),
+        material,
+      );
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      return mesh;
+    };
+    const carriage = railMesh([12, 8, 6], metal);
+    const xRail = railMesh([72, 4, 5], metal);
+    const xRunner = railMesh([7, 6, 7], dark);
+    const yRail = railMesh([4, 4, 76], metal);
+    const yRunner = railMesh([8, 6, 7], dark);
+    const tipLiquid = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x7f9985,
+        roughness: 0.15,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.DoubleSide,
       }),
     );
-    carriage.position.set(11, 90, -24);
-    scene.add(carriage);
+    tipGroup.add(tipLiquid);
     const loader = new GLTFLoader();
     let front: THREE.Object3D | undefined,
       disposed = false;
     const loaded: THREE.Object3D[] = [];
-    async function load(name: string, parent: THREE.Group) {
+    async function load(name: string, parent: THREE.Group, url: string) {
       try {
-        const gltf = await loader.loadAsync(`/assets/${name}.glb`);
+        const gltf = await loader.loadAsync(url);
         if (disposed) return;
         gltf.scene.traverse((o) => {
           if (o instanceof THREE.Mesh) {
@@ -237,6 +265,13 @@ export function Workbench(props: Props) {
                   p.transmission = 0.18;
                   p.roughness = 0.3;
                   p.color.set(0xc4cec3);
+                  if (name === "tip") {
+                    p.transmission = 0.1;
+                    p.transparent = true;
+                    p.opacity = 0.48;
+                    p.depthWrite = false;
+                    p.roughness = 0.2;
+                  }
                 }
               }
             }
@@ -244,6 +279,7 @@ export function Workbench(props: Props) {
           if (o.name === "tube_front") front = o;
         });
         parent.add(gltf.scene);
+        if (name.startsWith("holder-")) gltf.scene.name = name;
         loaded.push(gltf.scene);
         update(latest.current);
         request();
@@ -252,11 +288,13 @@ export function Workbench(props: Props) {
         setError(true);
       }
     }
-    void load("workcell", stage);
-    void load("holder", assembly);
-    void load("tube", tubeGroup);
-    void load("tip", tipGroup);
-    let lastVolume = -1,
+    void load("workcell", stage, workcellURL);
+    for (const [path, url] of Object.entries(holderURLs))
+      void load(path.split("/").at(-1)!.replace(".glb", ""), stage, url);
+    void load("tube", tubeGroup, tubeURL);
+    void load("tip", tipGroup, tipURL);
+    let lastFluidKey = "",
+      lastHeld = -1,
       raf = 0;
     function request() {
       if (!raf && !document.hidden)
@@ -267,27 +305,78 @@ export function Workbench(props: Props) {
     }
     function update(p: Props) {
       assembly.rotation.z = (-p.world.tilt * Math.PI) / 180;
-      tubeGroup.position.set(0, 0, 0);
       assembly.position.copy(point(p.world.pose));
+      stage.children.forEach((o) => {
+        if (o.name.startsWith("holder-")) {
+          o.position.copy(point(p.world.fixturePose ?? [0, 0, 0]));
+          o.visible =
+            o.name === `holder-${p.world.tilt}-${p.world.fixture.indexed}`;
+        }
+      });
       tipGroup.position.copy(point(p.tip));
-      carriage.position.y = p.tip[2] + 59;
+      const headZ = p.tip[2] + 77;
+      carriage.position.set(22, headZ, -18);
+      xRail.position.set(0, headZ, -13);
+      xRunner.position.set(p.tip[0], headZ, -13);
+      yRail.position.set(p.tip[0], headZ, -1);
+      yRunner.position.set(p.tip[0], headZ, -p.tip[1]);
       if (front) front.visible = !p.cutaway;
-      if (Math.abs(lastVolume - p.world.volume) > 0.1) {
-        lastVolume = p.world.volume;
-        const h = liquidHeight(p.world.volume, p.world.tilt, p.tip);
+      const h =
+        liquidHeight(p.world.volume, p.world.tilt, p.tip, p.world.pose[2]) -
+        p.world.pose[2];
+      const fluidKey = `${h.toFixed(3)}-${p.world.tilt}`;
+      if (fluidKey !== lastFluidKey) {
+        lastFluidKey = fluidKey;
         fluid.geometry.dispose();
         fluid.geometry = fluidMesh(h, p.world.tilt);
         meniscus.visible = p.world.tilt === 0;
-        meniscus.position.y = h;
+        meniscus.position.y = h + 0.015;
         meniscus.scale.setScalar(innerRadius(h) / 4.3);
       }
+      if (Math.abs(lastHeld - p.aspirated) > 0.1) {
+        lastHeld = p.aspirated;
+        const r0 = 0.12,
+          r1 = 2.87,
+          taper = D.tip.taperLength;
+        const coneVolume =
+          (Math.PI * taper * (r0 * r0 + r0 * r1 + r1 * r1)) / 3;
+        let height = taper;
+        if (p.aspirated < coneVolume) {
+          let lo = 0,
+            hi = taper;
+          for (let j = 0; j < 24; j++) {
+            const m = (lo + hi) / 2,
+              r = r0 + ((r1 - r0) * m) / taper,
+              v = (Math.PI * m * (r0 * r0 + r0 * r + r * r)) / 3;
+            if (v < p.aspirated) lo = m;
+            else hi = m;
+          }
+          height = (lo + hi) / 2;
+        } else height += (p.aspirated - coneVolume) / (Math.PI * 3.45 ** 2);
+        const profile = [new THREE.Vector2(0, 0), new THREE.Vector2(r0, 0)];
+        if (height > taper)
+          profile.push(
+            new THREE.Vector2(r1, taper),
+            new THREE.Vector2(3.45, taper + 0.25),
+          );
+        profile.push(
+          new THREE.Vector2(
+            height > taper ? 3.45 : r0 + ((r1 - r0) * height) / taper,
+            height,
+          ),
+          new THREE.Vector2(0, height),
+        );
+        tipLiquid.geometry.dispose();
+        tipLiquid.geometry = new THREE.LatheGeometry(profile, 48);
+      }
+      tipLiquid.visible = p.aspirated > 0.1;
       const pp = point(pelletPosition(p.world));
       pellet.position.copy(pp);
       protectedRing.position.copy(pp);
       uncertainty.position.copy(pp);
       protectedRing.visible = p.showBelief;
       uncertainty.visible = p.showBelief;
-      path.visible = p.showBelief;
+
       request();
     }
     const resize = new ResizeObserver(() => {
@@ -327,7 +416,7 @@ export function Workbench(props: Props) {
   }, [props.world, props.tip, props.cutaway, props.showBelief, props.active]);
   useEffect(() => {
     api.current?.reset();
-  }, [props.reset]);
+  }, [props.reset, props.overview]);
   return (
     <div
       className="scene-canvas"

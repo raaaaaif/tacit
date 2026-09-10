@@ -11,7 +11,13 @@ export function CameraFrame({
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    if (!packet || !canvas.current) return;
+    if (!canvas.current) return;
+    if (!packet) {
+      canvas.current
+        .getContext("2d")
+        ?.clearRect(0, 0, canvas.current.width, canvas.current.height);
+      return;
+    }
     const ctx = canvas.current.getContext("2d");
     if (!ctx) return;
     canvas.current.width = packet.calibration.width;
@@ -35,15 +41,15 @@ export function CameraFrame({
       </div>
       <div className="camera-image">
         <canvas ref={canvas} />
-        <div className="camera-reticle" />
+        {packet && <div className="camera-reticle" />}
         <span className="camera-time mono">
-          {packet ? `${packet.t.toFixed(2)} s` : "ACQUIRING"}
+          {packet ? `${packet.t.toFixed(2)} s` : "NO CAPTURE"}
         </span>
       </div>
       <div className="camera-caption">
         {packet
           ? `${packet.calibration.width} × ${packet.calibration.height} · simulated optics`
-          : "Preparing camera snapshot"}
+          : "No observation at this time"}
       </div>
     </div>
   );

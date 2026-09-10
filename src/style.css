@@ -1576,3 +1576,100 @@ footer .mono {
     scroll-behavior: auto !important;
   }
 }
+.search-results {
+  border-top: 1px solid #d8e1ce;
+  padding: 19px 0;
+  margin-top: 16px;
+}
+.search-results svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 5px;
+}
+.search-results svg text {
+  font:
+    8px "IBM Plex Mono",
+    monospace;
+  fill: #879a77;
+}
+.search-method {
+  font-size: 9px;
+  color: #8d9d80;
+  line-height: 1.7;
+}
+.candidate-metrics {
+  display: flex;
+  gap: 24px;
+  margin: 15px 0;
+}
+.candidate-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.candidate-metrics span {
+  font-size: 9px;
+  color: #8b9c7d;
+}
+.candidate-metrics strong {
+  font-size: 17px;
+  font-weight: 450;
+  color: #536e43;
+}
+.candidate-metrics small {
+  font-size: 10px;
+  color: #899e7a;
+}
+.eyebrow {
+  font-size: 10px;
+}
+.panel-header .eyebrow,
+.section-label {
+  font-size: 9px;
+}
+.scenario-select label,
+.controller-field label,
+.design-field label {
+  font-size: 9px;
+}
+.camera-caption {
+  font-size: 7px;
+}
+.timeline-heading .eyebrow {
+  font-size: 9px;
+}
+.timeline-legend {
+  font-size: 9px;
+}
+.model-label {
+  font-size: 8px;
+}
+.build-label {
+  font-size: 9px;
+}
+.viewport-id {
+  font-size: 10px;
+}
+.viewport-subtitle {
+  font-size: 11px;
+}
+
+.run-outcome {
+  border-left: 2px solid var(--amber);
+  padding: 0 0 0 12px;
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.run-outcome strong {
+  font-weight: 500;
+}
+.run-outcome p {
+  color: var(--muted);
+  margin: 6px 0;
+}
+.run-outcome .text-button {
+  font-size: 12px;
+  padding: 5px 0;
+}

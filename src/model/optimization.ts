@@ -1,4 +1,12 @@
-import type { ScenarioSpec, PolicySpec, RunTrace, Tilt } from "./types";
+import { scenario as makeScenario } from "./scenarios";
+import type {
+  ScenarioSpec,
+  PolicySpec,
+  RunTrace,
+  Tilt,
+  ScenarioId,
+} from "./types";
+import { surfaceSupport } from "./reference";
 import { runSimulation } from "./simulation";
 import { stream, clamp } from "./math";
 export interface Candidate {
@@ -54,6 +62,7 @@ export function optimize(
     population?: number;
     generations?: number;
     trainingSeeds?: number[];
+    families?: ScenarioId[];
     onProgress?: (generation: number, candidate: Candidate) => void;
   } = {},
 ): SearchResult {
@@ -63,20 +72,24 @@ export function optimize(
     seeds = options.trainingSeeds ?? [33011, 33013],
     all: Candidate[] = [],
     history: { generation: number; best: number }[] = [];
+  if (n < 4 || n > 32 || generations < 1 || generations > 100 || !seeds.length)
+    throw Error("Unsupported optimization budget.");
   let evaluations = 0;
   function evaluate(x: number[]): Candidate {
     const decoded = decode(x, base);
-    const results = seeds.map(
-      (seed) =>
-        runSimulation(
-          {
-            ...scenario,
-            seed,
-            fixture: { ...scenario.fixture, tilt: decoded.tilt },
-          },
-          decoded.policy,
-        ).result,
-    );
+    const results = seeds.map((seed, i) => {
+      const template = options.families
+        ? makeScenario(options.families[i % options.families.length], seed)
+        : scenario;
+      return runSimulation(
+        {
+          ...template,
+          seed,
+          fixture: { ...template.fixture, tilt: decoded.tilt },
+        },
+        decoded.policy,
+      ).result;
+    });
     const remaining =
         results.reduce((a, r) => a + r.remaining, 0) / seeds.length,
       seconds = results.reduce((a, r) => a + r.seconds, 0) / seeds.length,
@@ -92,7 +105,12 @@ export function optimize(
       seconds,
       violations,
       stops,
-      score: violations * 1e6 + remaining + seconds * 0.3,
+      score: !surfaceSupport(decoded.tilt, [
+        scenario.volume - 60,
+        scenario.volume + 60,
+      ]).supported
+        ? 1e9
+        : violations * 1e6 + remaining + seconds * 0.3,
     };
     evaluations++;
     all.push(candidate);
@@ -137,10 +155,15 @@ export function optimize(
     history.push({ generation: generation + 1, best: best.score });
     options.onProgress?.(generation + 1, best);
   }
-  const frontier = all
+  const eligible = all.filter(
+    (c) =>
+      surfaceSupport(c.tilt, [scenario.volume - 60, scenario.volume + 60])
+        .supported,
+  );
+  const frontier = eligible
     .filter(
       (a, i) =>
-        !all.some(
+        !eligible.some(
           (b, j) =>
             j !== i &&
             b.violations <= a.violations &&

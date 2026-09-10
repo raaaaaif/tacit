@@ -243,6 +243,29 @@ export function extractFeatures(packet: ObservationPacket): Features {
       }
     }
   if (best > 4) level = c.center[2] + (h / 2 - levelY) * c.mmPerPixel;
+  let tubeY: number | null = null;
+  let overheadX: number | null = null;
+  if (c.view === "overhead") {
+    const rim: { x: number; y: number }[] = [];
+    for (let y = 2; y < h - 2; y++)
+      for (let x = 2; x < w - 2; x++)
+        if (valid[y * w + x] && gray(x, y) < 170) rim.push({ x, y });
+    if (rim.length > 30) {
+      overheadX =
+        ((Math.min(...rim.map((p) => p.x)) + Math.max(...rim.map((p) => p.x))) /
+          2 +
+          0.5 -
+          w / 2) *
+        c.mmPerPixel;
+      tubeY =
+        (h / 2 -
+          (Math.min(...rim.map((p) => p.y)) +
+            Math.max(...rim.map((p) => p.y))) /
+            2 -
+          0.5) *
+        c.mmPerPixel;
+    }
+  }
   // Pellet detection is intentionally conservative: no artificial labels or color coding.
   let pelletAngle: number | null = null,
     px = 0,
@@ -268,7 +291,13 @@ export function extractFeatures(packet: ObservationPacket): Features {
   return {
     level,
     levelSigma: Math.max(0.28, 1.2 / (best || 1)),
-    tubeX: dark.length > 5 ? (center - w / 2) * c.mmPerPixel : null,
+    tubeX:
+      c.view === "overhead"
+        ? overheadX
+        : dark.length > 5
+          ? (center + 0.5 - w / 2) * c.mmPerPixel
+          : null,
+    tubeY,
     tubeXSigma: c.view === "side" ? 0.4 : 0.5,
     pelletAngle,
     pelletSigma: 0.55,

@@ -1,157 +1,174 @@
 import { writeFileSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
 import { scenario, policy, CONTROLLERS } from "../src/model/scenarios";
 import { runSimulation } from "../src/model/simulation";
-import { MODEL_VERSION, sweptClearance, toWorld } from "../src/model/geometry";
-import { worldFromScenario } from "../src/model/scenarios";
-import { stream, wilson } from "../src/model/math";
+import { MODEL_VERSION } from "../src/model/geometry";
+import { wilson, stream, quantile } from "../src/model/math";
 import { optimize } from "../src/model/optimization";
 import type {
-  ExperimentReport,
+  ControllerId,
   ScenarioId,
-  PolicySummary,
-  RunTrace,
+  PolicySpec,
+  Tilt,
 } from "../src/model/types";
-const arg = (key: string, fallback: number) => {
+const arg = (key: string, fallback: string) => {
   const i = process.argv.indexOf(key);
-  return i >= 0 ? Number(process.argv[i + 1]) : fallback;
+  return i >= 0 ? process.argv[i + 1] : fallback;
 };
-const n = arg("--n", 512),
-  stressN = arg("--stress", 4096),
-  search = process.argv.includes("--optimize");
+const n = Number(arg("--n", "512")),
+  selected = arg("--controller", "all");
+if (!Number.isInteger(n) || n < 1 || n > 4096)
+  throw Error("Episode count must be 1–4096.");
 mkdirSync("public/data", { recursive: true });
-const summaries: PolicySummary[] = [],
-  episodes: {
-    scenario: string;
-    controller: string;
-    seed: number;
-    remaining: number;
-    seconds: number;
-    status: string;
-    violations: string[];
-  }[] = [];
-const seeds = Array.from({ length: n }, (_, i) => 100003 + i * 17);
-for (const c of CONTROLLERS) {
-  let remaining = 0,
-    seconds = 0,
-    violationCount = 0,
-    completed = 0,
-    stopped = 0,
-    observations = 0;
-  for (let i = 0; i < n; i++) {
-    const id = (["known", "shifted", "missing"] as ScenarioId[])[i % 3];
-    const s = scenario(id, seeds[i]);
-    const trace = runSimulation(s, policy(c.id));
-    const r = trace.result;
-    remaining += r.remaining;
-    seconds += r.seconds;
-    violationCount += r.violations.length ? 1 : 0;
-    completed += r.status === "completed" ? 1 : 0;
-    stopped += r.status === "stopped" ? 1 : 0;
-    observations += r.observations;
-    episodes.push({
-      scenario: id,
-      controller: c.id,
-      seed: s.seed,
+const families: ScenarioId[] = ["known", "shifted", "missing"];
+type Episode = {
+  scenario: string;
+  controller: string;
+  seed: number;
+  remaining: number;
+  seconds: number;
+  status: string;
+  violations: string[];
+  observations: number;
+};
+function evaluate(p: PolicySpec, tilt: Tilt, seeds: number[]): Episode[] {
+  return seeds.map((seed, i) => {
+    const s = scenario(families[i % 3], seed);
+    s.fixture.tilt = tilt;
+    const r = runSimulation(s, p).result;
+    if (i % 128 === 0) console.log(p.controller, seed, i, seeds.length);
+    return {
+      scenario: s.id,
+      controller: p.controller,
+      seed,
       remaining: r.remaining,
       seconds: r.seconds,
       status: r.status,
       violations: r.violations,
-    });
-    if (i % 64 === 0) console.log(`${c.id}: ${i}/${n}`);
-  }
-  summaries.push({
-    controller: c.id,
-    n,
-    meanRemaining: remaining / n,
-    meanSeconds: seconds / n,
-    violationRate: violationCount / n,
-    violationCI: wilson(violationCount, n),
-    completed,
-    stopped,
-    meanObservations: observations / n,
+      observations: r.observations,
+    };
   });
 }
-let rejected = 0;
-const random = stream(4147, "geometry-stress");
-for (let i = 0; i < stressN; i++) {
-  const s = scenario("known", i + 1);
-  s.fixture.tilt = ([0, 5, 10] as const)[i % 3];
-  const w = worldFromScenario(s);
-  const end = toWorld(
-    [(random() - 0.5) * 8, (random() - 0.5) * 8, 2 + random() * 23],
-    w.tilt,
-    w.pose,
+function summarize(rows: Episode[]) {
+  const mean = (key: "remaining" | "seconds" | "observations") =>
+    rows.reduce((v, r) => v + r[key], 0) / rows.length;
+  const bootstrap = (key: "remaining" | "seconds") => {
+    const r = stream(9481, `bootstrap-${key}`),
+      means = [];
+    for (let j = 0; j < 1000; j++) {
+      let sum = 0;
+      for (let i = 0; i < rows.length; i++)
+        sum += rows[Math.floor(r() * rows.length)][key];
+      means.push(sum / rows.length);
+    }
+    return [quantile(means, 0.025), quantile(means, 0.975)];
+  };
+  const k = rows.filter((r) => r.violations.length).length;
+  return {
+    controller: rows[0].controller,
+    n: rows.length,
+    meanRemaining: mean("remaining"),
+    meanSeconds: mean("seconds"),
+    remainingCI: bootstrap("remaining"),
+    secondsCI: bootstrap("seconds"),
+    violationRate: k / rows.length,
+    violationCI: wilson(k, rows.length),
+    completed: rows.filter((r) => r.status === "completed").length,
+    stopped: rows.filter((r) => r.status === "stopped").length,
+    meanObservations: mean("observations"),
+  };
+}
+const heldOut = Array.from({ length: n }, (_, i) => 100003 + i * 17),
+  tuning = Array.from({ length: 24 }, (_, i) => 61003 + i * 17),
+  training = Array.from({ length: 12 }, (_, i) => 33011 + i * 17);
+for (const c of CONTROLLERS.filter(
+  (c) => selected === "all" || c.id === selected,
+)) {
+  const baseline = evaluate(policy(c.id), 0, heldOut);
+  const searches = [739, 1459, 2903].map((seed) =>
+    optimize(scenario("known"), policy(c.id), seed, {
+      trainingSeeds: training,
+      families,
+      population: 8,
+      generations: 3,
+      onProgress: (g) => console.log("search", c.id, seed, g),
+    }),
   );
-  if (sweptClearance([0, -1.5, 42], end, w) < 0) rejected++;
-}
-const report: ExperimentReport = {
-  version: 1,
-  modelVersion: MODEL_VERSION,
-  generatedAt: new Date().toISOString(),
-  split:
-    "Held-out IID scene seeds, stratified approximately equally over the three authored scenario families. All controllers receive the same scenes.",
-  seeds,
-  summaries,
-  stress: { n: stressN, rejected },
-  notes: [
-    "These are synthetic model outcomes, not biological success rates.",
-    "Intervals are Wilson 95% confidence intervals for whole-episode constraint violations.",
-    "Stops are distinct from completed tasks and remain in residual-volume averages.",
-    "Geometric stress sampling is reported separately from rendered evaluation.",
-    "No optimization is performed on the held-out scenes.",
-  ],
-};
-writeFileSync(
-  "public/data/experiment.json",
-  JSON.stringify(report, null, 2) + "\n",
-);
-writeFileSync(
-  "public/data/episodes.csv",
-  "scenario,controller,seed,remaining_uL,seconds,status,violations\n" +
-    episodes
-      .map((r) =>
-        [
-          r.scenario,
-          r.controller,
-          r.seed,
-          r.remaining.toFixed(4),
-          r.seconds.toFixed(4),
-          r.status,
-          r.violations.join(";"),
-        ].join(","),
-      )
-      .join("\n"),
-);
-for (const id of ["known", "shifted", "missing"] as const) {
-  const trace = runSimulation(scenario(id), policy("belief"));
-  trace.provenance.kind = "recorded";
-  writeFileSync(`public/data/demo-${id}.json`, JSON.stringify(trace));
-}
-if (search) {
-  const searches = [];
-  for (const seed of [739, 1459, 2903])
-    searches.push(
-      optimize(scenario("known"), policy("belief"), seed, {
-        trainingSeeds: [33011, 33013, 33017, 33019],
-        population: 8,
-        generations: 3,
-        onProgress: (g) => console.log(`Optimization ${seed}: generation ${g}`),
-      }),
+  const tuned = searches
+    .map((search) => {
+      const rows = evaluate(search.best.policy, search.best.tilt, tuning);
+      const summary = summarize(rows);
+      return {
+        search,
+        summary,
+        score:
+          summary.violationRate * 1e6 +
+          summary.meanRemaining +
+          0.3 * summary.meanSeconds,
+      };
+    })
+    .sort((a, b) => a.score - b.score);
+  const chosen = tuned[0],
+    optimized = evaluate(
+      chosen.search.best.policy,
+      chosen.search.best.tilt,
+      heldOut,
     );
+  const artifact = {
+    version: 1,
+    modelVersion: MODEL_VERSION,
+    sourceCommit: process.env.GITHUB_SHA ?? "local",
+    controller: c.id,
+    seeds: heldOut,
+    trainingSeeds: training,
+    tuningSeeds: tuning,
+    optimizationSeeds: [739, 1459, 2903],
+    baseline: summarize(baseline),
+    optimized: summarize(optimized),
+    byScenario: families.map((id) => ({
+      scenario: id,
+      baseline: summarize(baseline.filter((r) => r.scenario === id)),
+      optimized: summarize(optimized.filter((r) => r.scenario === id)),
+    })),
+    chosen: {
+      policy: chosen.search.best.policy,
+      tilt: chosen.search.best.tilt,
+      optimizationSeed: chosen.search.seed,
+    },
+    searches,
+    tuning: tuned.map((t) => ({ seed: t.search.seed, summary: t.summary })),
+  };
   writeFileSync(
-    "public/data/search.json",
-    JSON.stringify(
-      {
-        version: 1,
-        modelVersion: MODEL_VERSION,
-        searches,
-        notes:
-          "Training-only search, never fitted to held-out results. Equal evaluation budget per optimization seed. The default-policy evaluation is separate; no uplift claim is inferred from training scores.",
-      },
-      null,
-      2,
-    ),
+    `public/data/controller-${c.id}.json`,
+    JSON.stringify(artifact, null, 2),
+  );
+  writeFileSync(
+    `public/data/episodes-${c.id}.csv`,
+    "comparison,scenario,controller,seed,remaining_uL,seconds,status,violations\n" +
+      [
+        ["baseline", baseline],
+        ["optimized", optimized],
+      ]
+        .flatMap(([label, rows]) =>
+          (rows as Episode[]).map((r) =>
+            [
+              label,
+              r.scenario,
+              r.controller,
+              r.seed,
+              r.remaining.toFixed(4),
+              r.seconds.toFixed(4),
+              r.status,
+              r.violations.join(";"),
+            ].join(","),
+          ),
+        )
+        .join("\n"),
+  );
+  console.log(
+    c.id,
+    JSON.stringify({
+      baseline: artifact.baseline,
+      optimized: artifact.optimized,
+    }),
   );
 }
-console.log(JSON.stringify(summaries, null, 2));

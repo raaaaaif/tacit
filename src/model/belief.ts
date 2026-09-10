@@ -40,6 +40,16 @@ export function summarize(b: BeliefState): BeliefState {
       0.975,
     ),
   ];
+  b.poseY = [
+    weighted(
+      ps.map((p) => ({ value: p.pose[1], weight: p.weight })),
+      0.025,
+    ),
+    weighted(
+      ps.map((p) => ({ value: p.pose[1], weight: p.weight })),
+      0.975,
+    ),
+  ];
   b.effectiveN = 1 / ps.reduce((s, p) => s + p.weight * p.weight, 0);
   return b;
 }
@@ -47,14 +57,16 @@ export function initialBelief(s: ScenarioSpec, count = 128): BeliefState {
   const r = stream(s.seed, "prior");
   const particles = Array.from({ length: count }, () => ({
     volume: s.volume + normal(r) * 35,
+    levelBias: normal(r) * Math.hypot(s.cameraBias, 0.3),
     pose: [
-      normal(r) * Math.max(0.2, s.poseSigma),
-      normal(r) * Math.max(0.2, s.poseSigma),
+      normal(r) * Math.hypot(0.2, s.poseSigma, s.fixture.seatingSigma),
+      normal(r) * Math.hypot(0.2, s.poseSigma, s.fixture.seatingSigma),
       0,
     ] as [number, number, number],
-    pelletAngle: s.historyKnown
-      ? Math.PI / 2 + normal(r) * 0.3
-      : r() * Math.PI * 2,
+    pelletAngle:
+      s.historyKnown && s.fixture.indexed
+        ? Math.PI / 2 + normal(r) * 0.3
+        : r() * Math.PI * 2,
     weight: 1 / count,
   }));
   return summarize({
@@ -64,7 +76,8 @@ export function initialBelief(s: ScenarioSpec, count = 128): BeliefState {
     observations: 0,
     volume: [0, 0],
     poseX: [0, 0],
-    pelletKnown: s.historyKnown,
+    poseY: [0, 0],
+    pelletKnown: s.historyKnown && s.fixture.indexed,
     effectiveN: count,
   });
 }
@@ -84,16 +97,36 @@ export function updateBelief(
   for (const p of particles) {
     let log = 0;
     if (features.level !== null) {
-      const predicted = liquidHeight(p.volume, s.fixture.tilt);
-      const sigma = Math.hypot(features.levelSigma, s.cameraBias, 0.3);
+      const predicted =
+        liquidHeight(p.volume, s.fixture.tilt) + (p.levelBias ?? 0);
+      const sigma = features.levelSigma;
       log -= 0.5 * ((predicted - features.level) / sigma) ** 2;
     }
-    if (features.tubeX !== null && packet.calibration.view === "side") {
+    if (
+      features.tubeX !== null &&
+      packet.calibration.view === "side" &&
+      !b.seenGroups.some((g) => g.startsWith("side-"))
+    ) {
       const expected = p.pose[0] + Math.sin(radians(s.fixture.tilt)) * 16;
       log -=
         0.5 *
         ((expected - features.tubeX) / Math.hypot(features.tubeXSigma, 0.2)) **
           2;
+    }
+    if (
+      packet.calibration.view === "overhead" &&
+      !b.seenGroups.some((g) => g.startsWith("overhead-"))
+    ) {
+      if (features.tubeX !== null)
+        log -=
+          0.5 *
+          ((p.pose[0] +
+            Math.sin(radians(s.fixture.tilt)) * 31 -
+            features.tubeX) /
+            Math.hypot(0.55, Math.sin(radians(s.fixture.tilt)) * 5)) **
+            2;
+      if (features.tubeY != null)
+        log -= 0.5 * ((p.pose[1] - features.tubeY) / 0.5) ** 2;
     }
     if (features.pelletAngle !== null)
       log -=

@@ -1,8 +1,9 @@
+import { fixtureDistance } from "./fixtureGeometry";
 import D from "./dimensions.json";
 import type { Vec3, Tilt, WorldState, FixtureSpec } from "./types";
 import { clamp, radians, sub, length } from "./math";
 export { D };
-export const MODEL_VERSION = "tacit-0.1.0";
+export const MODEL_VERSION = "tacit-0.2.0";
 export const innerRadius = (z: number) =>
   z < 0
     ? 0
@@ -126,7 +127,7 @@ export function pelletPosition(
 }
 export function instrumentClearance(
   tip: Vec3,
-  w: Pick<WorldState, "tilt" | "pose" | "fixture">,
+  w: Pick<WorldState, "tilt" | "pose" | "fixture" | "fixturePose">,
 ) {
   let min = Infinity;
   const end = D.tip.taperLength + D.tip.shaftLength;
@@ -156,21 +157,11 @@ export function instrumentClearance(
         Math.hypot(q[0], q[1] - cap[1]) - D.tube.capRadius - r,
       );
     }
-    /* Holder's solid base and support columns. */ if (
-      q[2] < -1 &&
-      Math.abs(q[0]) < D.holder.width / 2 + r &&
-      Math.abs(q[1]) < D.holder.depth / 2 + r
-    )
-      min = Math.min(min, q[2] + 1 - r);
-    if (q[2] > 0 && q[2] < D.holder.seatHeight) {
-      for (const side of [-1, 1]) {
-        const dx = Math.abs(q[0] - side * 9) - 2.5,
-          dy = Math.abs(q[1]) - 5;
-        const outside = Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
-        const inside = Math.min(Math.max(dx, dy), 0);
-        min = Math.min(min, outside + inside - r);
-      }
-    }
+    // The holder stays fixed to the bench even when the specimen seating pose varies.
+    min = Math.min(
+      min,
+      fixtureDistance(sub(p, w.fixturePose ?? [0, 0, 0]), w.fixture) - r,
+    );
   }
   return min;
 }
@@ -178,7 +169,7 @@ export function instrumentClearance(
 export function sweptClearance(
   from: Vec3,
   to: Vec3,
-  w: Pick<WorldState, "tilt" | "pose" | "fixture">,
+  w: Pick<WorldState, "tilt" | "pose" | "fixture" | "fixturePose">,
 ) {
   const dist = length(sub(to, from));
   if (dist < 1e-9) return instrumentClearance(to, w);
@@ -219,3 +210,33 @@ export const defaultFixture: FixtureSpec = {
   seatingSigma: 0.15,
   clearance: 0.35,
 };
+
+/** Conservative swept distance of every axial instrument section to the protected pellet. */
+export function sweptPelletClearance(
+  from: Vec3,
+  to: Vec3,
+  pellet: Vec3,
+  radius: number,
+) {
+  const delta = sub(to, from),
+    den = delta.reduce((sum, v) => sum + v * v, 0);
+  let closest = Infinity;
+  for (let z = 0; z <= D.tip.taperLength + D.tip.shaftLength; z += 0.4) {
+    const start: Vec3 = [from[0], from[1], from[2] + z];
+    const t =
+      den > 0
+        ? clamp(
+            sub(pellet, start).reduce((sum, v, i) => sum + v * delta[i], 0) /
+              den,
+            0,
+            1,
+          )
+        : 0;
+    const center = start.map((v, i) => v + delta[i] * t) as Vec3;
+    closest = Math.min(
+      closest,
+      length(sub(center, pellet)) - radius - tipRadius(z) - 0.21,
+    );
+  }
+  return closest;
+}

@@ -6,7 +6,7 @@ import type {
   WorldState,
 } from "./types";
 import { defaultFixture, innerRadius } from "./geometry";
-import { normal, stream } from "./math";
+import { normal, stream, clamp } from "./math";
 export const SCENARIOS: {
   id: ScenarioId;
   name: string;
@@ -101,22 +101,42 @@ export function policy(controller: ControllerId): PolicySpec {
   };
 }
 export function worldFromScenario(s: ScenarioSpec): WorldState {
-  const r = stream(s.seed, "world");
-  const pose: [number, number, number] = [
-    normal(r) * s.poseSigma + (s.id === "shifted" ? 1.15 : 0),
-    normal(r) * s.poseSigma,
+  const r = stream(s.seed, "world-pose"),
+    volumeRandom = stream(s.seed, "world-volume"),
+    pelletRandom = stream(s.seed, "world-pellet"),
+    orientationRandom = stream(s.seed, "world-orientation");
+  const sigma = s.poseSigma;
+  const fixturePose: [number, number, number] = [
+    normal(r) * sigma + (s.id === "shifted" ? 1.15 : 0),
+    normal(r) * sigma,
     0,
   ];
-  const angle = s.historyKnown
-    ? Math.PI / 2 + normal(r) * 0.18
-    : r() * Math.PI * 2;
+  const seating = stream(s.seed, "world-seating"),
+    offset = [
+      normal(seating) * s.fixture.seatingSigma,
+      normal(seating) * s.fixture.seatingSigma,
+    ];
+  const scale = Math.min(
+    1,
+    (s.fixture.clearance * 0.8) / (Math.hypot(...offset) || 1),
+  );
+  const pose: [number, number, number] = [
+    fixturePose[0] + offset[0] * scale,
+    fixturePose[1] + offset[1] * scale,
+    0,
+  ];
+  const angle =
+    s.historyKnown && s.fixture.indexed
+      ? Math.PI / 2 + normal(orientationRandom) * 0.18
+      : orientationRandom() * Math.PI * 2;
   return {
-    volume: s.volume + normal(r) * 18,
+    volume: s.volume + normal(volumeRandom) * 18,
     initialVolume: s.volume + 0,
     pose,
+    fixturePose,
     tilt: s.fixture.tilt,
     pelletAngle: angle,
-    pelletZ: 3.3 + normal(r) * 0.15,
+    pelletZ: 3.3 + normal(pelletRandom) * 0.15,
     pelletRadius: 0.65,
     contrast: s.contrast,
     fixture: s.fixture,

@@ -29,7 +29,12 @@ import {
   X,
 } from "lucide-react";
 import { Workbench } from "./scene/Workbench";
+import { initialBelief } from "./model/belief";
+import { traceFile, readTraceFile } from "./model/traceFile";
+import { playbackState, packetAt, PARKED_TIP } from "./model/playback";
 import { CameraFrame } from "./components/CameraFrame";
+import { SearchResults } from "./components/SearchResults";
+import type { SearchResult, Candidate } from "./model/optimization";
 import {
   SCENARIOS,
   CONTROLLERS,
@@ -46,6 +51,7 @@ import type {
   Tilt,
   Vec3,
   ExperimentReport,
+  PolicySpec,
 } from "./model/types";
 type Mode = "run" | "investigate" | "design";
 function save(name: string, value: unknown, type = "application/json") {
@@ -70,6 +76,7 @@ export default function App() {
     [cutaway, setCutaway] = useState(true),
     [showBelief, setShowBelief] = useState(true),
     [reset, setReset] = useState(0),
+    [overview, setOverview] = useState(false),
     [inspector, setInspector] = useState(false),
     [about, setAbout] = useState(false),
     [trace, setTrace] = useState<RunTrace | null>(null),
@@ -81,15 +88,27 @@ export default function App() {
     [speed, setSpeed] = useState(2),
     [error, setError] = useState(""),
     [report, setReport] = useState<ExperimentReport | null>(null),
-    [exporting, setExporting] = useState(false);
+    [exporting, setExporting] = useState(false),
+    [searching, setSearching] = useState(false),
+    [searchGeneration, setSearchGeneration] = useState(0),
+    [searchResult, setSearchResult] = useState<SearchResult | null>(null),
+    [customPolicy, setCustomPolicy] = useState<PolicySpec | null>(null);
+  const [importedRun, setImportedRun] = useState<{
+    trace: RunTrace;
+    packets: ObservationPacket[];
+  } | null>(null);
+  const selectedPolicy =
+    customPolicy?.controller === controller ? customPolicy : policy(controller);
   const worker = useRef<Worker | null>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const config = useMemo(() => {
+    if (importedRun) return importedRun.trace.scenario;
     const s = scenario(scenarioId, seed);
     s.fixture.tilt = tilt;
     s.fixture.indexed = indexed;
     return s;
-  }, [scenarioId, seed, tilt, indexed]);
+  }, [scenarioId, seed, tilt, indexed, importedRun]);
+  const initialEstimate = useMemo(() => initialBelief(config), [config]);
   const initial = useMemo(() => worldFromScenario(config), [config]);
   function createWorker() {
     const w = new Worker(
@@ -100,19 +119,28 @@ export default function App() {
       const m = e.data;
       if (m.type === "progress") setProgress(m.progress);
       if (m.type === "preview") setPackets(m.packets);
+      if (m.type === "search-progress") setSearchGeneration(m.generation);
+      if (m.type === "search-done") {
+        setSearchResult(m.result);
+        setSearching(false);
+        setBusy(false);
+      }
       if (m.type === "done") {
         setTrace(m.trace);
         setPackets(m.packets);
         setBusy(false);
+        setSearching(false);
         setTime(0);
         setPlaying(true);
       }
       if (m.type === "error") {
+        setSearching(false);
         setError(m.message);
         setBusy(false);
       }
     };
     w.onerror = (e) => {
+      setSearching(false);
       setError(e.message);
       setBusy(false);
     };
@@ -121,15 +149,26 @@ export default function App() {
   }
   useEffect(() => {
     const w = createWorker();
+    if (importedRun) {
+      setTrace(importedRun.trace);
+      setPackets(importedRun.packets);
+      setTime(0);
+      setPlaying(false);
+      setBusy(false);
+      setSearching(false);
+      return () => w.terminate();
+    }
     w.postMessage({
       type: "preview",
       scenario: config,
       policy: policy(controller),
     });
+    setPackets([]);
     setTrace(null);
     setTime(0);
     setPlaying(false);
     setBusy(false);
+    setSearching(false);
     return () => w.terminate();
   }, [config]);
   useEffect(() => {
@@ -165,32 +204,11 @@ export default function App() {
     document.addEventListener("visibilitychange", hidden);
     return () => document.removeEventListener("visibilitychange", hidden);
   }, []);
-  const currentIndex = trace
-      ? Math.max(
-          0,
-          trace.events.findLastIndex((e) => e.t <= time),
-        )
-      : 0,
-    current = trace?.events[currentIndex],
-    previous = trace?.events[Math.max(0, currentIndex - 1)];
-  const u = current
-    ? Math.min(1, Math.max(0, (time - current.t) / (current.duration || 1)))
-    : 0;
-  const visibleVolume = current
-    ? current.action.kind === "aspirate"
-      ? (previous?.volume ?? initial.volume) +
-        (current.volume - (previous?.volume ?? initial.volume)) * u
-      : current.volume
-    : initial.volume;
-  const tip: Vec3 = current
-    ? current.action.kind === "move"
-      ? (current.tip.map(
-          (v, i) =>
-            (previous?.tip[i] ?? [0, -1.5, 42][i]) +
-            (v - (previous?.tip[i] ?? [0, -1.5, 42][i])) * u,
-        ) as Vec3)
-      : current.tip
-    : [0, -1.5, 42];
+  const playback = trace ? playbackState(trace, time) : null;
+  const currentIndex = playback?.index ?? 0;
+  const current = playback?.event;
+  const visibleVolume = playback?.volume ?? initial.volume;
+  const tip: Vec3 = playback?.tip ?? PARKED_TIP;
   const visibleWorld = useMemo(
     () => ({
       ...(trace?.initial ?? initial),
@@ -204,15 +222,20 @@ export default function App() {
   const stateLabel = busy
     ? "Computing"
     : playing
-      ? "Executing"
+      ? trace?.provenance.kind === "recorded"
+        ? "Saved replay"
+        : "Playing run"
       : finished
-        ? "Run complete"
+        ? trace?.result.status === "completed"
+          ? "Target reached"
+          : trace?.result.status === "violated"
+            ? "Run halted"
+            : "Stopped"
         : trace
           ? "Paused"
           : "Ready to run";
   const activePacket = (view: "side" | "overhead") =>
-    packets.filter((p) => p.calibration.view === view && p.t <= time).at(-1) ??
-    packets.find((p) => p.calibration.view === view);
+    packetAt(packets, view, time);
   const sInfo = SCENARIOS.find((s) => s.id === scenarioId)!;
   const run = () => {
     setError("");
@@ -222,7 +245,7 @@ export default function App() {
     worker.current?.postMessage({
       type: "run",
       scenario: config,
-      policy: policy(controller),
+      policy: selectedPolicy,
     });
   };
   function cancel() {
@@ -230,6 +253,28 @@ export default function App() {
     createWorker();
     setBusy(false);
     setProgress(0);
+    setSearching(false);
+  }
+  function searchPolicies() {
+    setError("");
+    setBusy(true);
+    setSearching(true);
+    setPlaying(false);
+    setSearchGeneration(0);
+    worker.current?.postMessage({
+      type: "optimize",
+      scenario: config,
+      policy: selectedPolicy,
+    });
+  }
+  function applyCandidate(c: Candidate) {
+    setImportedRun(null);
+    setCustomPolicy(c.policy);
+    setController(c.policy.controller);
+    setTilt(c.tilt);
+    setTrace(null);
+    setTime(0);
+    setPlaying(false);
   }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
@@ -237,7 +282,25 @@ export default function App() {
         return;
       if (e.code === "Space") {
         e.preventDefault();
-        trace ? setPlaying((v) => !v) : run();
+        if (busy) cancel();
+        else if (!trace) run();
+        else {
+          if (finished) setTime(0);
+          setPlaying((v) => !v);
+        }
+      }
+      if (trace && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        setPlaying(false);
+        setTime((t) =>
+          Math.max(
+            0,
+            Math.min(
+              trace.result.seconds,
+              t + (e.key === "ArrowRight" ? 1 : -1) / 60,
+            ),
+          ),
+        );
       }
       if (e.key === "Escape") {
         setAbout(false);
@@ -247,7 +310,7 @@ export default function App() {
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [trace, config, controller]);
+  }, [trace, config, controller, busy, finished, selectedPolicy]);
   function exportCSV() {
     if (!trace) return;
     save(
@@ -273,12 +336,11 @@ export default function App() {
     try {
       const { exportFixture } = await import("./cad/fixture");
       const result = await exportFixture(config.fixture);
-      save("tacit-holder-dimensions.json", result.notes);
       const a = document.createElement("a");
       a.href = URL.createObjectURL(
-        new Blob([result.stl], { type: "model/stl" }),
+        new Blob([result.bundle as BlobPart], { type: "application/zip" }),
       );
-      a.download = `tacit-holder-${tilt}deg.stl`;
+      a.download = `tacit-holder-${tilt}deg.zip`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
     } catch (e) {
@@ -291,19 +353,18 @@ export default function App() {
     try {
       if (file.size > 5_000_000) throw Error("Trace exceeds the 5 MB limit.");
       const input = JSON.parse(await file.text());
-      const { validateTrace } = await import("./model/validation");
-      const t = validateTrace(input);
+      const bundle = readTraceFile(input),
+        t = bundle.trace;
+      setError("");
       setPlaying(false);
       setScenario(t.scenario.id);
       setSeed(t.scenario.seed);
       setTilt(t.scenario.fixture.tilt);
+      setIndexed(t.scenario.fixture.indexed);
       setController(t.policy.controller);
-      setTimeout(() => {
-        setTrace(t);
-        setTime(t.result.seconds);
-        setPackets([]);
-        setMode("investigate");
-      }, 100);
+      setCustomPolicy(t.policy);
+      setImportedRun(bundle);
+      setMode("investigate");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not import trace.");
     }
@@ -323,17 +384,17 @@ export default function App() {
           <span className="brand-description">
             PHYSICAL REASONING
             <br />
-            WORKBENCH / 01
+            WORKBENCH
           </span>
         </a>
         <nav className="mode-nav" aria-label="Workbench mode">
-          {(["run", "investigate", "design"] as Mode[]).map((m, i) => (
+          {(["run", "investigate", "design"] as Mode[]).map((m) => (
             <button
               key={m}
               className={mode === m ? "selected" : ""}
               onClick={() => setMode(m)}
+              aria-current={mode === m ? "page" : undefined}
             >
-              <span className="nav-number">0{i + 1}</span>
               {m[0].toUpperCase() + m.slice(1)}
             </button>
           ))}
@@ -371,13 +432,22 @@ export default function App() {
             <div className="viewport-top">
               <div className="viewport-id">
                 <span className="small-cross">+</span>
-                <span className="mono">WORKCELL A—01</span>
+                <span className="mono">ASPIRATION WORKCELL</span>
                 <span className="viewport-divider" />
                 <span className="viewport-subtitle">
                   {cutaway ? "Section view" : "Material view"}
                 </span>
               </div>
               <div className="viewport-tools">
+                <button
+                  className="icon-button"
+                  aria-label={
+                    overview ? "View tube detail" : "View whole workcell"
+                  }
+                  onClick={() => setOverview((v) => !v)}
+                >
+                  <Maximize2 size={17} />
+                </button>
                 <button
                   className={cutaway ? "on" : ""}
                   aria-label="Toggle tube cutaway"
@@ -405,6 +475,8 @@ export default function App() {
             </div>
             <Workbench
               world={visibleWorld}
+              overview={overview}
+              aspirated={playback?.aspirated ?? 0}
               tip={tip}
               cutaway={cutaway}
               showBelief={showBelief}
@@ -422,7 +494,7 @@ export default function App() {
                 PELLET EXCLUSION ENVELOPE
                 <small>
                   {showBelief
-                    ? "Uncertainty shown at physical scale"
+                    ? "1.8 mm clearance around the model pellet"
                     : "Overlay hidden"}
                 </small>
               </div>
@@ -481,13 +553,14 @@ export default function App() {
                       id="scenario"
                       value={scenarioId}
                       onChange={(e) => {
+                        setImportedRun(null);
                         setScenario(e.target.value as ScenarioId);
                         setIndexed(e.target.value !== "missing");
                       }}
                     >
                       {SCENARIOS.map((s) => (
                         <option key={s.id} value={s.id}>
-                          {s.number} / {s.name}
+                          {s.name}
                         </option>
                       ))}
                     </select>
@@ -502,6 +575,8 @@ export default function App() {
                       id="controller"
                       value={controller}
                       onChange={(e) => {
+                        setImportedRun(null);
+                        setCustomPolicy(null);
                         setController(e.target.value as ControllerId);
                         setTrace(null);
                         setPlaying(false);
@@ -562,21 +637,47 @@ export default function App() {
                     )}
                   </button>
                 </div>
+                {finished && (
+                  <div className="run-outcome" role="status">
+                    <strong>
+                      {trace.result.status === "completed"
+                        ? "Bulk-removal target reached"
+                        : trace.result.status === "violated"
+                          ? "Execution halted"
+                          : "Stopped with liquid retained"}
+                    </strong>
+                    <p>{trace.result.reason}</p>
+                    <button
+                      className="text-button"
+                      onClick={() => setMode("investigate")}
+                    >
+                      Inspect this decision <ArrowRight size={14} />
+                    </button>
+                  </div>
+                )}
                 <div className="thin-divider" />
                 <div className="section-label">
                   <span>OBSERVATION CHANNELS</span>
-                  <span className="mono">02</span>
+                  <span className="mono">RGB</span>
                 </div>
                 <div className="camera-grid">
                   <CameraFrame
                     label="SIDE"
                     packet={activePacket("side")}
-                    active={current?.observation?.view === "side"}
+                    active={
+                      playing &&
+                      current?.action.kind === "observe" &&
+                      current.observation?.view === "side"
+                    }
                   />
                   <CameraFrame
                     label="OVERHEAD"
                     packet={activePacket("overhead")}
-                    active={current?.observation?.view === "overhead"}
+                    active={
+                      playing &&
+                      current?.action.kind === "observe" &&
+                      current.observation?.view === "overhead"
+                    }
                   />
                 </div>
                 <button
@@ -606,7 +707,7 @@ export default function App() {
                   <>
                     <div className="decision-card">
                       <div className="eyebrow">
-                        DECISION {String(currentIndex + 1).padStart(2, "0")}{" "}
+                        DECISION {currentIndex + 1}{" "}
                         <span>/ {trace.events.length}</span>
                       </div>
                       <h3>
@@ -624,14 +725,16 @@ export default function App() {
                       <div>
                         <span>Liquid estimate · 95% interval</span>
                         <strong>
-                          {current?.belief.volume.map(format).join(" – ")}{" "}
+                          {(playback?.belief ?? initialEstimate).volume
+                            .map(format)
+                            .join(" – ")}{" "}
                           <small>µL</small>
                         </strong>
                       </div>
                       <div>
                         <span>Pellet orientation</span>
                         <strong>
-                          {current?.belief.pelletKnown
+                          {(playback?.belief ?? initialEstimate).pelletKnown
                             ? "History / evidence available"
                             : "Unresolved"}
                         </strong>
@@ -659,7 +762,9 @@ export default function App() {
                     <div className="export-buttons">
                       <button
                         className="secondary-button"
-                        onClick={() => save(`${trace.id}.json`, trace)}
+                        onClick={() =>
+                          save(`${trace.id}.json`, traceFile(trace, packets))
+                        }
                       >
                         <Download size={15} />
                         Trace JSON
@@ -712,7 +817,10 @@ export default function App() {
                     {([0, 5, 10] as Tilt[]).map((v) => (
                       <button
                         key={v}
-                        onClick={() => setTilt(v)}
+                        onClick={() => {
+                          setImportedRun(null);
+                          setTilt(v);
+                        }}
                         className={tilt === v ? "selected" : ""}
                       >
                         <span
@@ -732,7 +840,10 @@ export default function App() {
                   <input
                     type="checkbox"
                     checked={indexed}
-                    onChange={(e) => setIndexed(e.target.checked)}
+                    onChange={(e) => {
+                      setImportedRun(null);
+                      setIndexed(e.target.checked);
+                    }}
                   />
                   <span className="toggle" />
                 </label>
@@ -756,6 +867,20 @@ export default function App() {
                   <strong>{config.fixture.window} mm</strong>
                 </div>
                 <div className="design-actions">
+                  <button
+                    className="secondary-button"
+                    onClick={searching ? cancel : searchPolicies}
+                    disabled={busy && !searching}
+                  >
+                    {searching ? (
+                      <LoaderCircle size={15} className="spin" />
+                    ) : (
+                      <SlidersHorizontal size={15} />
+                    )}
+                    {searching
+                      ? `Cancel search · generation ${searchGeneration}/3`
+                      : "Search policy alternatives"}
+                  </button>
                   <button
                     className="primary-button"
                     onClick={() => {
@@ -784,6 +909,15 @@ export default function App() {
                   Untested bench fixture. Nominal geometry. Verify fit before
                   fabrication.
                 </p>
+                {searchResult && (
+                  <SearchResults
+                    result={searchResult}
+                    onApply={applyCandidate}
+                    onExport={() =>
+                      save("tacit-policy-search.json", searchResult)
+                    }
+                  />
+                )}
               </>
             )}
             {inspector && (
@@ -793,9 +927,15 @@ export default function App() {
                   <input
                     type="number"
                     value={seed}
-                    onChange={(e) =>
-                      setSeed(Math.max(1, Number(e.target.value) || 1))
-                    }
+                    onChange={(e) => (
+                      setImportedRun(null),
+                      setSeed(
+                        Math.min(
+                          4294967295,
+                          Math.max(1, Math.floor(Number(e.target.value)) || 1),
+                        ),
+                      )
+                    )}
                   />
                 </label>
                 <div>
@@ -841,14 +981,38 @@ export default function App() {
                 <RotateCcw size={14} />
               </button>
               <button
+                className="icon-button"
+                aria-label="Previous frame"
+                title="Previous frame · ←"
+                disabled={!trace}
+                onClick={() => {
+                  setPlaying(false);
+                  setTime((t) => Math.max(0, t - 1 / 60));
+                }}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                className="icon-button"
+                aria-label="Next frame"
+                title="Next frame · →"
+                disabled={!trace}
+                onClick={() => {
+                  setPlaying(false);
+                  setTime((t) => Math.min(trace!.result.seconds, t + 1 / 60));
+                }}
+              >
+                <ChevronRight size={14} />
+              </button>
+              <button
                 className="speed-button mono"
                 onClick={() => setSpeed((v) => (v === 1 ? 2 : v === 2 ? 4 : 1))}
               >
                 {speed}×
               </button>
               <span className="timeline-clock mono">
-                {time.toFixed(1)}{" "}
-                <span>/ {trace?.result.seconds.toFixed(1) ?? "—"} s</span>
+                {time.toFixed(2)}{" "}
+                <span>/ {trace?.result.seconds.toFixed(2) ?? "—"} s</span>
               </span>
             </div>
           </div>
@@ -901,7 +1065,12 @@ export default function App() {
               disabled={!trace}
               onChange={(e) => {
                 setPlaying(false);
-                setTime(Number(e.target.value));
+                const value = Number(e.target.value);
+                setTime(
+                  trace && value >= trace.result.seconds - 0.011
+                    ? trace.result.seconds
+                    : value,
+                );
               }}
             />
           </div>

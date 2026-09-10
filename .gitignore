@@ -8,3 +8,6 @@ work/
 .wrangler/
 *.tsbuildinfo
 .playwright-cli/
+
+__pycache__/
+*.pyc

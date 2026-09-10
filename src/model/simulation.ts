@@ -1,3 +1,4 @@
+import { surfaceSupport } from "./reference";
 import type {
   ScenarioSpec,
   PolicySpec,
@@ -20,6 +21,7 @@ import {
   pelletPosition,
   instrumentClearance,
   sweptClearance,
+  sweptPelletClearance,
   moveTime,
 } from "./geometry";
 import { worldFromScenario } from "./scenarios";
@@ -67,8 +69,10 @@ function plausibleClearance(
   const poses =
     p.controller === "belief"
       ? ([
-          [b.poseX[0], mean.pose[1] - 0.25, 0],
-          [b.poseX[1], mean.pose[1] + 0.25, 0],
+          [b.poseX[0], b.poseY[0], 0],
+          [b.poseX[0], b.poseY[1], 0],
+          [b.poseX[1], b.poseY[0], 0],
+          [b.poseX[1], b.poseY[1], 0],
           mean.pose,
         ] as Vec3[])
       : [p.controller === "nominal" ? ([0, 0, 0] as Vec3) : mean.pose];
@@ -77,6 +81,7 @@ function plausibleClearance(
       sweptClearance(from, to, {
         tilt: s.fixture.tilt,
         pose,
+        fixturePose: pose,
         fixture: s.fixture,
       }),
     ),
@@ -93,6 +98,7 @@ export function runSimulation(
   let b = initialBelief(s),
     tip: Vec3 = [0, -1.5, 42],
     held = 0,
+    commanded = 0,
     t = 0,
     minClearance = 100,
     aspirations = 0;
@@ -136,8 +142,8 @@ export function runSimulation(
     options.onProgress?.(Math.min(0.95, held / initial.volume));
   }
   function observe(view: "side" | "overhead", why: string) {
-    const group = `${view}-v${Math.round(world.volume)}`;
-    const packet = renderObservation(world, view, s.seed, t, group);
+    const group = `${view}-epoch-${aspirations}`;
+    const packet = renderObservation(world, view, s.seed, t + 0.7, group);
     options.onObservation?.(packet);
     const updated = updateBelief(b, packet, s);
     b = updated.belief;
@@ -151,6 +157,15 @@ export function runSimulation(
     observe(
       "side",
       "Locate the tube and liquid surface before committing a trajectory.",
+    );
+  if (
+    p.controller === "belief" &&
+    b.pelletKnown &&
+    b.poseY[1] - b.poseY[0] > 1.0
+  )
+    observe(
+      "overhead",
+      "The side view cannot resolve seating depth. Use the overhead view to constrain the lateral pose.",
     );
   if (p.controller === "belief" && !b.pelletKnown) {
     observe(
@@ -178,6 +193,7 @@ export function runSimulation(
         ],
         volume: [world.volume, world.volume],
         poseX: [world.pose[0], world.pose[0]],
+        poseY: [world.pose[1], world.pose[1]],
         pelletKnown: true,
         effectiveN: 1,
       };
@@ -190,17 +206,29 @@ export function runSimulation(
       status = "completed";
       break;
     }
-    if (held >= D.tip.capacity - 1) {
+    if (commanded * (1 + 3 * s.pumpSigma) >= D.tip.capacity - 1) {
       reason = "Tip capacity reached. A fresh handling cycle is required.";
+      break;
+    }
+    const support = surfaceSupport(
+      s.fixture.tilt,
+      p.controller === "belief" ? b.volume : [remaining, remaining],
+    );
+    if (
+      !support.supported &&
+      (p.controller === "belief" || p.controller === "oracle")
+    ) {
+      reason = support.reason;
       break;
     }
     const target = chooseTarget(s, b, p);
     const conservative = plausibleClearance(s, b, p, tip, target);
-    if (p.controller === "belief" && conservative < D.operating.wallBuffer) {
+    if (
+      (p.controller === "belief" || p.controller === "oracle") &&
+      conservative < D.operating.wallBuffer
+    ) {
       reason = "The credible tube poses do not admit a clear instrument path.";
-      if (aspirations === 0 && b.observations < 2) {
-        observe("side", "Check the alignment before rejecting the path.");
-      }
+
       break;
     }
     const estimatedPellet = pelletPosition({
@@ -210,22 +238,41 @@ export function runSimulation(
       pelletZ: 3.3,
       pelletRadius: 0.65,
     });
-    const estimatedGap =
-      length(sub(target, estimatedPellet)) - 0.65 - D.tip.apertureRadius;
+    const estimatedGap = sweptPelletClearance(
+      tip,
+      target,
+      estimatedPellet,
+      0.65,
+    );
     if (
-      p.controller === "belief" &&
-      estimatedGap < p.margin + Math.max(0.3, (b.poseX[1] - b.poseX[0]) / 2)
+      (p.controller === "belief" || p.controller === "oracle") &&
+      estimatedGap <
+        p.margin +
+          (p.controller === "oracle"
+            ? 0
+            : Math.max(
+                0.3,
+                (b.poseX[1] - b.poseX[0]) / 2,
+                (b.poseY[1] - b.poseY[0]) / 2,
+              ))
     ) {
       reason =
-        "The remaining uncertainty consumes the pellet clearance. Stop before entering the protected region.";
+        p.controller === "oracle"
+          ? "Further descent would enter the declared pellet exclusion envelope."
+          : "The remaining uncertainty consumes the pellet clearance. Stop before entering the protected region.";
       break;
     }
     const actual = sweptClearance(tip, target, world);
     const moveErrors: string[] = [];
     const pellet = pelletPosition(world),
-      pelletClearance =
-        length(sub(target, pellet)) - world.pelletRadius - D.tip.apertureRadius;
-    if (pelletClearance < p.margin) moveErrors.push("pellet-envelope");
+      pelletClearance = sweptPelletClearance(
+        tip,
+        target,
+        pellet,
+        world.pelletRadius,
+      );
+    if (pelletClearance < D.operating.pelletBuffer)
+      moveErrors.push("pellet-envelope");
     if (
       Math.abs(target[0]) > D.stage.xyLimit ||
       Math.abs(target[1]) > D.stage.xyLimit ||
@@ -244,12 +291,16 @@ export function runSimulation(
       moveErrors,
     );
     if (moveErrors.length) {
-      reason = "The complete instrument envelope intersects the workcell.";
+      reason = moveErrors.includes("pellet-envelope")
+        ? "The swept instrument enters the declared pellet exclusion envelope."
+        : "The complete instrument envelope intersects the workcell.";
       break;
     }
     const stoppingHeight =
       tip[2] +
-      (p.controller === "belief" ? D.operating.surfaceAllowance : 0.65);
+      (p.controller === "belief" || p.controller === "oracle"
+        ? Math.max(D.operating.surfaceAllowance, support.depression)
+        : 0.65);
     const lowerVolume = p.controller === "belief" ? b.volume[0] : remaining;
     const immersedReserve =
       volumeAtHeight(stoppingHeight, s.fixture.tilt) -
@@ -258,7 +309,10 @@ export function runSimulation(
       p.chunk,
       Math.max(0, remaining - p.residualTarget),
       Math.max(0, (lowerVolume - immersedReserve) / (1 + 3 * s.pumpSigma)),
-      D.tip.capacity - held,
+      Math.max(0, D.tip.capacity / (1 + 3 * s.pumpSigma) - commanded),
+      p.controller === "belief" || p.controller === "oracle"
+        ? Math.max(0, (lowerVolume - 100) / (1 + 3 * s.pumpSigma))
+        : Infinity,
     );
     if (requested < 3) {
       reason =
@@ -269,7 +323,7 @@ export function runSimulation(
     const before = liquidHeight(world.volume, world.tilt, tip);
     const desired = requested * (1 + normal(actuation) * s.pumpSigma);
     let lo = 0,
-      hi = Math.min(world.volume, desired);
+      hi = Math.min(world.volume, desired, D.tip.capacity - held);
     for (let i = 0; i < 18; i++) {
       const v = (lo + hi) / 2;
       if (liquidHeight(world.volume - v, world.tilt, tip) > tip[2] + 0.4)
@@ -281,8 +335,16 @@ export function runSimulation(
     held += removed;
     b = predictWithdrawal(b, requested, s.pumpSigma, s.seed + aspirations);
     aspirations++;
+    commanded += requested;
     const errors: string[] = [];
-    if (pelletClearance < p.margin) errors.push("pellet-envelope");
+    if (
+      world.volume < 100 ||
+      world.volume > 950 ||
+      !surfaceSupport(world.tilt, [100, 950]).supported
+    )
+      errors.push("unsupported-surface");
+    if (pelletClearance < D.operating.pelletBuffer)
+      errors.push("pellet-envelope");
     if (before <= tip[2] + 0.4 || removed < requested * 0.9)
       errors.push("air-ingestion");
     record(
@@ -293,9 +355,11 @@ export function runSimulation(
       errors,
     );
     if (errors.length) {
-      reason = errors.includes("air-ingestion")
-        ? "The aperture loses liquid contact before completing the stroke."
-        : "The tip enters the declared pellet exclusion envelope.";
+      reason = errors.includes("unsupported-surface")
+        ? "The run leaves the supported equilibrium-reference domain."
+        : errors.includes("air-ingestion")
+          ? "The aperture loses liquid contact before completing the stroke."
+          : "The tip enters the declared pellet exclusion envelope.";
       break;
     }
     if (
