@@ -3,7 +3,7 @@ import D from "./dimensions.json";
 import type { Vec3, Tilt, WorldState, FixtureSpec } from "./types";
 import { clamp, radians, sub, length } from "./math";
 export { D };
-export const MODEL_VERSION = "tacit-0.2.0";
+export const MODEL_VERSION = "tacit-0.3.0";
 export const innerRadius = (z: number) =>
   z < 0
     ? 0
@@ -148,8 +148,8 @@ export function instrumentClearance(
       min = Math.min(min, q[2] - r);
     /* Open lid: parked behind the hinge in local +Y. */ const cap: Vec3 = [
       0,
-      11.4,
-      D.tube.innerTop + 1,
+      D.tube.capY,
+      D.tube.capZ,
     ];
     if (Math.abs(q[2] - cap[2]) < r + D.tube.capThickness / 2) {
       min = Math.min(
@@ -157,6 +157,14 @@ export function instrumentClearance(
         Math.hypot(q[0], q[1] - cap[1]) - D.tube.capRadius - r,
       );
     }
+    // The open-cap hinge joins the lip to the lid; include its whole box.
+    const hinge = q.map(
+      (v, i) => Math.abs(v - D.tube.hingeCenter[i]) - D.tube.hingeSize[i] / 2,
+    );
+    const hingeDistance =
+      Math.hypot(...hinge.map((v) => Math.max(0, v))) +
+      Math.min(0, Math.max(...hinge));
+    min = Math.min(min, hingeDistance - r);
     // The holder stays fixed to the bench even when the specimen seating pose varies.
     min = Math.min(
       min,

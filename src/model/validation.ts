@@ -1,65 +1,141 @@
 import type { RunTrace } from "./types";
 export function validateTrace(value: unknown): RunTrace {
   const t = value as RunTrace;
+  const fail = (
+    message = "This file is not a supported TACIT v1 trace.",
+  ): never => {
+    throw Error(message);
+  };
+  const number = (v: unknown, min = -1e6, max = 1e6) =>
+    typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+  const text = (v: unknown, max = 3000) =>
+    typeof v === "string" && v.length <= max;
+  const vector = (v: unknown, n = 3) =>
+    Array.isArray(v) &&
+    v.length === n &&
+    v.every((x) => number(x, -3000, 3000));
   if (
     !t ||
     typeof t !== "object" ||
     t.version !== 1 ||
-    typeof t.modelVersion !== "string" ||
+    !text(t.modelVersion, 64) ||
+    !text(t.id, 128) ||
     !t.scenario ||
-    !["known", "shifted", "missing"].includes(t.scenario.id) ||
     !t.policy ||
-    !["nominal", "estimate", "belief", "oracle"].includes(
-      t.policy.controller,
-    ) ||
     !t.initial ||
     !t.result ||
+    !t.provenance ||
     !Array.isArray(t.events) ||
-    t.events.length === 0 ||
+    !t.events.length ||
     t.events.length > 1000
   )
-    throw Error("This file is not a supported TACIT v1 trace.");
-  let visited = 0;
-  function finite(x: unknown, depth = 0) {
-    if (++visited > 200000 || depth > 15)
-      throw Error("Trace structure exceeds the supported size.");
-    if (typeof x === "number" && !Number.isFinite(x))
-      throw Error("Trace contains a non-finite number.");
-    if (Array.isArray(x)) x.forEach((v) => finite(v, depth + 1));
-    else if (x && typeof x === "object")
-      Object.values(x).forEach((v) => finite(v, depth + 1));
-  }
-  finite(t);
+    fail();
+  const s = t.scenario,
+    p = t.policy,
+    w = t.initial,
+    r = t.result;
+  const fixture = (f: typeof s.fixture) =>
+    f &&
+    f.version === 1 &&
+    [0, 5, 10].includes(f.tilt) &&
+    typeof f.indexed === "boolean" &&
+    number(f.window, 1, 50) &&
+    number(f.clearance, 0.01, 5) &&
+    number(f.seatingSigma, 0, 5);
   if (
-    ![0, 5, 10].includes(t.scenario.fixture?.tilt) ||
-    !Array.isArray(t.initial.pose) ||
-    t.initial.pose.length !== 3 ||
-    t.result.seconds < 0 ||
-    t.result.seconds > 86400
+    s.version !== 1 ||
+    !["known", "shifted", "missing"].includes(s.id) ||
+    !number(s.seed, 0, 4294967295) ||
+    !Number.isInteger(s.seed) ||
+    !number(s.volume, 0, 2000) ||
+    !fixture(s.fixture) ||
+    typeof s.historyKnown !== "boolean" ||
+    !number(s.contrast, 0, 1) ||
+    !number(s.poseSigma, 0, 5) ||
+    !number(s.pumpSigma, 0, 0.5) ||
+    !number(s.cameraBias, 0, 5)
   )
-    throw Error("Unsupported trace geometry or duration.");
-  let last = -1;
+    fail("Unsupported scenario in trace.");
+  if (
+    p.version !== 1 ||
+    !["nominal", "estimate", "belief", "oracle"].includes(p.controller) ||
+    !number(p.chunk, 1, 1000) ||
+    !number(p.margin, 0.01, 20) ||
+    !number(p.surfaceDepth, 0.01, 40) ||
+    !number(p.observeEvery, 1, 100) ||
+    !number(p.residualTarget, 0, 1500)
+  )
+    fail("Unsupported policy in trace.");
+  if (
+    !number(w.volume, 0, 2000) ||
+    !number(w.initialVolume, 0, 2000) ||
+    !vector(w.pose) ||
+    (w.fixturePose !== undefined && !vector(w.fixturePose)) ||
+    ![0, 5, 10].includes(w.tilt) ||
+    !number(w.pelletAngle, -20, 20) ||
+    !number(w.pelletZ, 0, 32) ||
+    !number(w.pelletRadius, 0.01, 5) ||
+    !number(w.contrast, 0, 1) ||
+    !fixture(w.fixture)
+  )
+    fail("Unsupported physical state in trace.");
+  if (
+    !number(r.seconds, 0, 86400) ||
+    !number(r.remaining, 0, 2000) ||
+    !number(r.removed, 0, 2000) ||
+    !number(r.minClearance, -1000, 1000) ||
+    !number(r.observations, 0, 1000) ||
+    !["completed", "stopped", "violated"].includes(r.status) ||
+    !text(r.reason) ||
+    !Array.isArray(r.violations) ||
+    !r.violations.every((v) => text(v, 100)) ||
+    Math.abs(w.volume - r.remaining - r.removed) > 0.01
+  )
+    fail("Invalid run outcome.");
+  if (
+    !text(t.provenance.source) ||
+    !text(t.provenance.referenceStatus) ||
+    !number(t.provenance.seed, 0, 4294967295)
+  )
+    fail("Missing trace provenance.");
+  let end = 0;
   for (const e of t.events) {
     if (
-      typeof e.t !== "number" ||
-      e.t < last ||
-      e.t > t.result.seconds ||
-      e.duration < 0 ||
-      !Array.isArray(e.tip) ||
-      e.tip.length !== 3 ||
-      e.tip.some((v) => typeof v !== "number" || Math.abs(v) > 1000) ||
-      !["move", "observe", "aspirate", "stop"].includes(e.action?.kind) ||
-      !Array.isArray(e.belief?.volume) ||
-      e.belief.volume.length !== 2 ||
-      !Array.isArray(e.belief.poseX) ||
+      !number(e.index, 0, 1000) ||
+      !number(e.t, 0, r.seconds) ||
+      e.t < end - 1e-6 ||
+      !number(e.duration, 0, 86400) ||
+      e.t + e.duration > r.seconds + 1e-6 ||
+      !vector(e.tip) ||
+      !number(e.volume, 0, 2000) ||
+      !number(e.aspirated, 0, 2000) ||
+      !number(e.clearance, -1000, 1000) ||
+      !text(e.reason) ||
       !Array.isArray(e.violations) ||
-      typeof e.reason !== "string" ||
-      typeof e.volume !== "number" ||
-      e.volume < 0 ||
-      e.volume > 2000
+      !e.violations.every((v) => text(v, 100)) ||
+      !e.belief ||
+      !vector(e.belief.volume, 2) ||
+      !vector(e.belief.poseX, 2) ||
+      typeof e.belief.pelletKnown !== "boolean" ||
+      !number(e.belief.effectiveN, 0, 10000) ||
+      !e.action ||
+      !["move", "observe", "aspirate", "stop"].includes(e.action.kind)
     )
-      throw Error("Invalid event in the imported trace.");
-    last = e.t;
+      fail("Invalid event in the imported trace.");
+    const a = e.action;
+    if (a.kind === "move" && !vector(a.to)) fail();
+    if (
+      a.kind === "aspirate" &&
+      (!number(a.volume, 0, 2000) || !number(a.rate, 0.01, 1000))
+    )
+      fail();
+    if (a.kind === "observe" && !["side", "overhead"].includes(a.view)) fail();
+    if (a.kind === "stop" && !text(a.reason)) fail();
+    if (Math.abs(e.volume + e.aspirated - w.volume) > 0.01)
+      fail("Trace does not conserve liquid volume.");
+    end = e.t + e.duration;
   }
+  if (Math.abs(end - r.seconds) > 1e-6)
+    fail("Trace duration and events disagree.");
   return { ...t, provenance: { ...t.provenance, kind: "recorded" } };
 }

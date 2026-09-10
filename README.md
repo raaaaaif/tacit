@@ -1,41 +1,73 @@
 # TACIT
 
-A physical reasoning workbench for laboratory automation. Built by Raaif Bokhari around a familiar wet-lab action: removing wash liquid while preserving an RNA pellet.
+A physical reasoning workbench for laboratory automation. One task—remove wash liquid while preserving an RNA pellet—connects a dimensioned 3D scene, rendered camera evidence, uncertain state estimates, constrained actions and a printable bench-holder concept.
 
-**Development build.** The interface and deterministic simulation are functional. Reference-model calculations, held-out experiments, and final release verification are tracked in the research workflow. This repository does not claim biological validation.
+Built by Raaif Bokhari as an independent project exploring scientific execution data and physical AI. It is a synthetic research workbench, not a biological validation study or a robot deployment.
 
 ## Run locally
 
-Node 24 is recommended.
+Use Node 24 (see `.nvmrc`).
 
 ```sh
 npm ci
 npm run dev
-npm test
-npm run build
 ```
 
-The browser app needs no account, API key, database, or local AI model. Three.js runs the explanatory view; a separate worker runs the simulation and pixel-based observations. CAD is loaded on demand.
+Open the printed localhost address. No login, API key, paid service or GPU compute is required. React/TypeScript/Vite power the UI; Three.js renders custom Blender assets. One worker handles interactive computation. Assets and fonts are local.
 
-## What is modeled
+## Use it
 
-- Nominal tube, complete tapered tip and shaft, cap, holder, and Cartesian travel.
-- Conserved liquid volume with immersed-tip displacement and inclined-container integration.
-- Air / polypropylene / liquid refraction; image-derived level and pose features.
-- A particle belief and controllers with different access to evidence.
-- Reproducible action traces, explicit stops, and constraint violations.
+- **Run:** choose a scenario and controller, then run. Space pauses or resumes; R resets the camera.
+- **Investigate:** scrub a run, step one frame at a time, and inspect timestamped camera evidence and decisions. Export JSON/CSV or import a saved trace.
+- **Design:** compare stationary holder inclinations, search policy alternatives, inspect results and export a ZIP containing STL, 3MF and dimension notes.
 
-Dimensions and material properties live in `src/model/dimensions.json`. All model geometry uses millimetres: 1 mm³ = 1 µL. Geometry is nominal; no manufacturer fit certification is implied. Near-tip hydrodynamics, adhesion, RNA yield, and final pellet-adjacent drying require physical validation.
+The opening scenario is ready to run. The additional scenarios expose changed setup and missing context. A deliberate stop is different from a completed task. The 10° surface-reference configuration is currently unsupported because one reference calculation failed to converge.
 
-## Reproducible assets
+## Reproduce checks
 
-`scripts/assets.py` authors the original labware and workcell using Blender. Run Blender in background mode with this script to regenerate the compact glTF assets. No external asset pack is used. IBM Plex fonts are self-hosted through Fontsource and retain their upstream licenses.
+```sh
+npm test
+npm run build
+npm run check:budget
+```
 
-## Research context
+Rebuild original meshes with an installed Blender:
 
-- [Transfyr: execution data for robotics](https://www.transfyr.ai/news/ai-robotics)
-- [Ethanol–water mixture properties](https://pcprakt.userpage.fu-berlin.de/SKRIPT/T13/DensityH2O_EtOH.pdf)
-- [Surface Evolver energy model](https://kenbrakke.com/evolver/html/energies.htm)
-- [Geometric optics](https://www.pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission)
+```sh
+npm run assets
+```
 
-Independent application project; no affiliation or integration with Transfyr is implied.
+On macOS, the asset runner finds `/Applications/Blender.app`. Elsewhere it uses `blender` on PATH. Set `TACIT_BLENDER` to override the executable. Asset generation uses two CPU threads. The app itself does not need Blender installed.
+
+The GitHub Actions **Held-out controller evaluation** workflow runs the longer experiment in bounded hosted jobs. It uses three optimization seeds per controller, separate training/tuning/evaluation scenes, 512 held-out episodes per primary comparison and a separate 4,096-case geometric stress sample. The generated artifact includes individual episodes and complete-episode outcomes. Locally, a small diagnostic can use:
+
+```sh
+npm run experiment -- --n 6 --controller nominal
+```
+
+That command still includes policy search; it is a diagnostic, not the published benchmark. Full batches belong in hosted CI.
+
+Surface Evolver is required only for rebuilding the offline equilibrium reference on Linux:
+
+```sh
+python3 scripts/surface_reference.py
+```
+
+The separate numerical check uses Python with SciPy:
+
+```sh
+npx tsx scripts/numeric-cases.ts
+python3 scripts/numerical-check.py
+```
+
+## Model and evidence
+
+Read [the methods dossier](docs/methods.md), [walkthrough script](docs/demo-script.md), and [application response draft](docs/application-response.md). The dimension source is [dimensions.json](src/model/dimensions.json). The scene, collision and CAD implementations share those dimensions; the fixture solid is [solid.ts](src/cad/solid.ts).
+
+Physical properties have sources. Labware geometry, wetting, seating accuracy, calibration, material appearance and control margins include explicit research assumptions. The model omits pellet adhesion, near-tip flow and biological outcomes. The independent Blender images expose renderer-dependent measurement error, including missed detections. The fixture has not been fabricated or fit-tested and is not a centrifuge component.
+
+## Static hosting
+
+The production site is `dist/`. Cloudflare Pages build command: `npm run build`; output directory: `dist`; Node version: 24. It requires no server, environment secret or always-on Mac. `_headers` supplies cache and security headers. GitHub Pages can also serve the same static output if configured with the appropriate base path.
+
+No telemetry is installed. All interactive computation and imports run in the viewer's browser.

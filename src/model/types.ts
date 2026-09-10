@@ -148,6 +148,8 @@ export interface PolicySummary {
   n: number;
   meanRemaining: number;
   meanSeconds: number;
+  remainingCI?: [number, number];
+  secondsCI?: [number, number];
   violationRate: number;
   violationCI: [number, number];
   completed: number;
@@ -161,6 +163,8 @@ export interface ExperimentReport {
   split: string;
   seeds: number[];
   summaries: PolicySummary[];
+  optimizedSummaries?: PolicySummary[];
+  policies?: { policy: PolicySpec; tilt: Tilt; optimizationSeed: number }[];
   stress: { n: number; rejected: number };
   notes: string[];
 }

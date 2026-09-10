@@ -1,7 +1,7 @@
 {
   "revision": "nominal-tube-01",
   "units": "mm",
-  "provenance": "Nominal research geometry, not a metrology-certified manufacturer replica. 1 mm³ = 1 µL.",
+  "provenance": "Nominal research geometry, not a metrology-certified manufacturer replica. 1 mm\u00b3 = 1 \u00b5L.",
   "tube": {
     "innerRadius": 4.3,
     "innerBaseRadius": 0.55,
@@ -12,7 +12,19 @@
     "lipRadius": 5.7,
     "lipHeight": 1.1,
     "capRadius": 5.7,
-    "capThickness": 1.15
+    "capThickness": 1.15,
+    "capY": 11.6,
+    "capZ": 32.55,
+    "hingeCenter": [
+      0,
+      6.1,
+      32.55
+    ],
+    "hingeSize": [
+      3.7,
+      4.2,
+      0.65
+    ]
   },
   "tip": {
     "apertureRadius": 0.28,
@@ -43,7 +55,7 @@
     "baseHeight": 3,
     "seatHeight": 15,
     "seatClearance": 0.35,
-    "windowWidth": 9
+    "windowWidth": 13
   },
   "operating": {
     "flowRate": 18,
@@ -51,6 +63,7 @@
     "pelletBuffer": 1.8,
     "wallBuffer": 0.2,
     "surfaceAllowance": 1.85,
-    "minimumResidual": 65
+    "minimumResidual": 100,
+    "bulkTarget": 150
   }
 }

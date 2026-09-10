@@ -9,6 +9,7 @@ import type {
 import { surfaceSupport } from "./reference";
 import { runSimulation } from "./simulation";
 import { stream, clamp } from "./math";
+import { MODEL_VERSION } from "./geometry";
 export interface Candidate {
   parameters: number[];
   policy: PolicySpec;
@@ -21,6 +22,7 @@ export interface Candidate {
 }
 export interface SearchResult {
   version: 1;
+  modelVersion: string;
   seed: number;
   evaluations: number;
   trainingSeeds: number[];
@@ -64,6 +66,7 @@ export function optimize(
     trainingSeeds?: number[];
     families?: ScenarioId[];
     onProgress?: (generation: number, candidate: Candidate) => void;
+    onEvaluation?: (completed: number, total: number) => void;
   } = {},
 ): SearchResult {
   const random = stream(seed, "differential-evolution"),
@@ -113,6 +116,7 @@ export function optimize(
         : violations * 1e6 + remaining + seconds * 0.3,
     };
     evaluations++;
+    options.onEvaluation?.(evaluations, n * (generations + 1));
     all.push(candidate);
     return candidate;
   }
@@ -184,6 +188,7 @@ export function optimize(
     );
   return {
     version: 1,
+    modelVersion: MODEL_VERSION,
     seed,
     evaluations,
     trainingSeeds: seeds,

@@ -6,6 +6,7 @@ import type {
   WorldState,
   Features,
 } from "./types";
+import { hardwareOccluder } from "./occlusion";
 import {
   D,
   innerRadius,
@@ -111,14 +112,18 @@ export function renderObservation(
   seed: number,
   t: number,
   exposureGroup: string,
+  options: { tip?: Vec3; calibrationSigma?: number; hardware?: boolean } = {},
 ): ObservationPacket {
   const c = calibration(view),
     pixels = new Uint8ClampedArray(c.width * c.height * 4),
     valid = new Uint8Array(c.width * c.height),
-    h = liquidHeight(w.volume, w.tilt, undefined, w.pose[2]),
+    h = liquidHeight(w.volume, w.tilt, options.tip, w.pose[2]),
     pellet = pelletPosition(w),
     random = stream(seed, `image-${view}-${exposureGroup}`),
-    bias = normal(stream(seed, `calibration-${view}`)) * 0.12;
+    bias =
+      normal(stream(seed, `calibration-${view}`)) *
+      (options.calibrationSigma ?? 0.12),
+    occluded = hardwareOccluder(w, options.tip);
   const step = 0.32;
   for (let y = 0; y < c.height; y++)
     for (let x = 0; x < c.width; x++) {
@@ -130,10 +135,16 @@ export function renderObservation(
         fluid = 0,
         hit = 0,
         bounces = 0,
-        ok = true;
+        ok = true,
+        hardwareHit = false;
       for (let i = 0; i < 155; i++) {
         const next = add(pos, mul(dir, step)),
           n = medium(next, w, h);
+        if (options.hardware !== false && occluded(next)) {
+          hardwareHit = true;
+          ok = false;
+          break;
+        }
         if (n !== m) {
           let lo = 0,
             hi = step;
@@ -174,7 +185,7 @@ export function renderObservation(
       const background = 225 + (5 * y) / c.height;
       const noisy = normal(random) * 1.5;
       const shade = clamp(
-        background -
+        (hardwareHit ? 125 : background) -
           glass * 7 -
           fluid * 3.2 -
           hit * 100 * w.contrast +
@@ -224,19 +235,29 @@ export function extractFeatures(packet: ObservationPacket): Features {
   let level: number | null = null,
     best = 0,
     levelY = 0;
-  const a = Math.max(1, Math.round(center - 6)),
-    b = Math.min(w - 2, Math.round(center + 6));
+  // A liquid boundary must span the tube interior. A small dark pellet or speck
+  // can create a strong local gradient, but cannot supply this horizontal support.
+  const halfSpan = Math.max(6, (right - left) * 0.32);
+  const a = Math.max(1, Math.round(center - halfSpan)),
+    b = Math.min(w - 2, Math.round(center + halfSpan));
   if (c.view === "side")
     for (let y = 5; y < h - 12; y++) {
       let difference = 0,
-        n = 0;
+        n = 0,
+        supportedColumns = 0;
       for (let x = a; x <= b; x++)
         if (valid[(y - 4) * w + x] && valid[(y + 4) * w + x]) {
-          difference += gray(x, y - 4) - gray(x, y + 4);
+          const delta = gray(x, y - 4) - gray(x, y + 4);
+          difference += delta;
+          if (delta > 5) supportedColumns++;
           n++;
         }
       difference /= n || 1;
-      if (difference > 8 && n >= 5) {
+      if (
+        difference > 8 &&
+        n >= Math.max(8, (b - a + 1) * 0.7) &&
+        supportedColumns >= n * 0.8
+      ) {
         best = difference;
         levelY = y + 2;
         break;

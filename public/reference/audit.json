@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "renderer": "Blender 5.2.1 LTS / Cycles CPU / 32 samples",
+  "cases": [
+    {
+      "id": "high-side",
+      "volume": 850,
+      "tilt": 0,
+      "view": "side",
+      "contrast": 0.75,
+      "referenceHeight": 21.42968750046566,
+      "file": "high-side.png",
+      "width": 112,
+      "height": 144,
+      "features": {
+        "level": 22.82,
+        "levelSigma": 0.28,
+        "tubeX": 0,
+        "tubeY": null,
+        "tubeXSigma": 0.4,
+        "pelletAngle": null,
+        "pelletSigma": 0.55,
+        "visiblePixels": 264,
+        "quality": 0.8169230769230769
+      },
+      "levelErrorMm": 1.390312499534339
+    },
+    {
+      "id": "low-side",
+      "volume": 350,
+      "tilt": 0,
+      "view": "side",
+      "contrast": 0.75,
+      "referenceHeight": 12.835937500465661,
+      "file": "low-side.png",
+      "width": 112,
+      "height": 144,
+      "features": {
+        "level": 13.16,
+        "levelSigma": 0.28,
+        "tubeX": 0,
+        "tubeY": null,
+        "tubeXSigma": 0.4,
+        "pelletAngle": null,
+        "pelletSigma": 0.55,
+        "visiblePixels": 264,
+        "quality": 1
+      },
+      "levelErrorMm": 0.32406249953433885
+    },
+    {
+      "id": "tilted-side",
+      "volume": 400,
+      "tilt": 5,
+      "view": "side",
+      "contrast": 0.75,
+      "referenceHeight": 13.638355689588934,
+      "file": "tilted-side.png",
+      "width": 112,
+      "height": 144,
+      "features": {
+        "level": 14,
+        "levelSigma": 0.28,
+        "tubeX": 1.68,
+        "tubeY": null,
+        "tubeXSigma": 0.4,
+        "pelletAngle": null,
+        "pelletSigma": 0.55,
+        "visiblePixels": 222,
+        "quality": 1
+      },
+      "levelErrorMm": 0.3616443104110658
+    },
+    {
+      "id": "visible-overhead",
+      "volume": 850,
+      "tilt": 0,
+      "view": "overhead",
+      "contrast": 0.75,
+      "referenceHeight": 21.42968750046566,
+      "file": "visible-overhead.png",
+      "width": 112,
+      "height": 144,
+      "features": {
+        "level": null,
+        "levelSigma": 1.2,
+        "tubeX": 0,
+        "tubeY": 1.28,
+        "tubeXSigma": 0.5,
+        "pelletAngle": null,
+        "pelletSigma": 0.55,
+        "visiblePixels": 684,
+        "quality": 0.35
+      },
+      "levelErrorMm": null
+    },
+    {
+      "id": "missing-overhead",
+      "volume": 850,
+      "tilt": 0,
+      "view": "overhead",
+      "contrast": 0.015,
+      "referenceHeight": 21.42968750046566,
+      "file": "missing-overhead.png",
+      "width": 112,
+      "height": 144,
+      "features": {
+        "level": null,
+        "levelSigma": 1.2,
+        "tubeX": 0,
+        "tubeY": 1.28,
+        "tubeXSigma": 0.5,
+        "pelletAngle": null,
+        "pelletSigma": 0.55,
+        "visiblePixels": 622,
+        "quality": 0.35
+      },
+      "levelErrorMm": null
+    }
+  ],
+  "scope": "Independent renderer consistency audit. Missed or biased detections are retained. This does not validate real-camera performance."
+}

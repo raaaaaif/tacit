@@ -45,6 +45,10 @@ const report = {
   summaries: reports.map((r) => r.baseline),
   optimizedSummaries: reports.map((r) => r.optimized),
   policies: reports.map((r) => r.chosen),
+  byScenario: reports.map((r) => ({
+    controller: r.controller,
+    outcomes: r.byScenario,
+  })),
   stress: { n: 4096, rejected },
   notes: [
     "Synthetic whole-episode results, not biological success rates.",

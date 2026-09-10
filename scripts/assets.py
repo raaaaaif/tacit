@@ -51,9 +51,9 @@ def group_objects(before):return [o for o in bpy.context.scene.objects if o.name
 T=D['tube'];profile=[(-.65,.0),(-.65,.65),(0,1.20),(11,5.05),(31.3,5.05),(31.7,5.45),(32.0,5.7),(33.1,5.7),(33.1,4.3),(11,4.3),(0,.55),(0,0)]
 before=set(o.name for o in bpy.context.scene.objects)
 lathe('tube_back',profile,poly,0,math.pi,64);lathe('tube_front',profile,poly,math.pi,2*math.pi,64)
-hinge=cube('Cap hinge',(0,6.1,32.55),(3.7,4.2,.65),poly,.25)
-cyl('Open cap',(0,11.6,32.55),5.7,1.15,poly)
-lathe('Cap sealing rim',[(31.98,4.3),(31.45,4.3),(31.45,4.7),(31.98,4.7)],poly).location.y=11.6
+hinge=cube('Cap hinge',tuple(T['hingeCenter']),tuple(T['hingeSize']),poly,.25)
+cyl('Open cap',(0,T['capY'],T['capZ']),T['capRadius'],T['capThickness'],poly)
+lathe('Cap sealing rim',[(31.98,4.3),(31.45,4.3),(31.45,4.7),(31.98,4.7)],poly).location.y=T['capY']
 for z in [14,18,22,26,30]:
     o=cube('Molded graduation',(0,-5.045,z),(2.3,.075,.12),warm,.03)
 export('tube',group_objects(before))
@@ -73,9 +73,12 @@ for source in sorted((ROOT/'work/fixture-meshes').glob('holder-*.json')):
     bm=bmesh.new();bm.from_mesh(mesh)
     bmesh.ops.remove_doubles(bm,verts=list(bm.verts),dist=.0001)
     bmesh.ops.dissolve_limit(bm,angle_limit=.005,verts=list(bm.verts),edges=list(bm.edges),use_dissolve_boundaries=False)
+    weights=bm.edges.layers.float.get('bevel_weight_edge') or bm.edges.layers.float.new('bevel_weight_edge')
+    for e in bm.edges:e[weights]=1.0 if len(e.link_faces)==2 and e.calc_length()>.8 and e.calc_face_angle(0)>.7 else 0.0
     bm.to_mesh(mesh);bm.free();mesh.update()
-    bevel(obj,.45,4)
-    obj.modifiers['Machined edge radius'].use_clamp_overlap=True
+    bevel(obj,.35,4)
+    obj.modifiers['Machined edge radius'].use_clamp_overlap=False
+    obj.modifiers['Machined edge radius'].limit_method='WEIGHT'
     details=[obj]
     for side in [-1,1]:
         for y in [-9,9]:details.append(cyl('Mount fastener',(side*13,y,-.95),1.05,.25,aluminum))
@@ -83,19 +86,19 @@ for source in sorted((ROOT/'work/fixture-meshes').glob('holder-*.json')):
     export(source.stem,details)
 # Restrained instrument platform and an actual linear stage.
 before=set(o.name for o in bpy.context.scene.objects)
-cube('Instrument plinth',(0,1,-6.0),(72,66,5.5),warm,2)
-cube('Isolation layer',(0,1,-9.0),(69,63,1.2),black,.6)
+cube('Instrument plinth',(0,1,-6.85),(72,66,5.5),warm,2)
+cube('Isolation layer',(0,1,-10.2),(69,63,1.2),black,.6)
 for x in [-26,26]:
-    for y in [-23,25]:cyl('Isolation foot',(x,y,-10),4.0,2,black)
+    for y in [-23,25]:cyl('Isolation foot',(x,y,-11.8),4.0,2,black)
 cube('Stage spine',(22,24,74),(11,10,160),aluminum,1.3)
 cube('Stage guide dark inset',(22,18.7,76),(5,.8,144),black,.25)
 for x in [19,25]:cyl('Linear rail',(x,18.0,76),.75,146,aluminum)
 for z in [6,147]:
     o=cyl('Rail fastener',(22,18.1,z),1.2,.35,black);o.rotation_euler[0]=math.pi/2
-cube('Calibration tile',(-23,-18,-3.1),(10,10,.18),slate,.3)
+cube('Calibration tile',(-23,-18,-4.0),(10,10,.18),slate,.3)
 for i in range(3):
     for j in range(3):
-        if(i+j)%2==0:cube('Calibration fiducial',(-26+i*3,-21+j*3,-2.99),(2.5,2.5,.03),warm,0)
+        if(i+j)%2==0:cube('Calibration fiducial',(-26+i*3,-21+j*3,-3.9),(2.5,2.5,.03),warm,0)
 export('workcell',group_objects(before))
 # Authoring scene retained as a reproducible source script; no bulky .blend required.
 print('TACIT assets exported:', ', '.join(p.name for p in OUT.glob('*.glb')))

@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "renderer": "Blender 5.2.1 LTS / Cycles CPU / 32 samples",
+  "cases": [
+    {
+      "id": "high-side",
+      "volume": 850,
+      "tilt": 0,
+      "view": "side",
+      "contrast": 0.75,
+      "referenceHeight": 21.42968750046566,
+      "file": "high-side.png",
+      "width": 112,
+      "height": 144
+    },
+    {
+      "id": "low-side",
+      "volume": 350,
+      "tilt": 0,
+      "view": "side",
+      "contrast": 0.75,
+      "referenceHeight": 12.835937500465661,
+      "file": "low-side.png",
+      "width": 112,
+      "height": 144
+    },
+    {
+      "id": "tilted-side",
+      "volume": 400,
+      "tilt": 5,
+      "view": "side",
+      "contrast": 0.75,
+      "referenceHeight": 13.638355689588934,
+      "file": "tilted-side.png",
+      "width": 112,
+      "height": 144
+    },
+    {
+      "id": "visible-overhead",
+      "volume": 850,
+      "tilt": 0,
+      "view": "overhead",
+      "contrast": 0.75,
+      "referenceHeight": 21.42968750046566,
+      "file": "visible-overhead.png",
+      "width": 112,
+      "height": 144
+    },
+    {
+      "id": "missing-overhead",
+      "volume": 850,
+      "tilt": 0,
+      "view": "overhead",
+      "contrast": 0.015,
+      "referenceHeight": 21.42968750046566,
+      "file": "missing-overhead.png",
+      "width": 112,
+      "height": 144
+    }
+  ],
+  "scope": "Independent synthetic renderer consistency check. Not real-camera accuracy. Optical properties and lighting are assumed."
+}

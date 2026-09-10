@@ -12,6 +12,8 @@ export function traceFile(trace: RunTrace, packets: ObservationPacket[]) {
   };
 }
 export function readTraceFile(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw Error("Choose a TACIT trace JSON file.");
   const { cameraPackets: omitted, ...traceFields } = value as Record<
     string,
     unknown

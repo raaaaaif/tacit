@@ -98,12 +98,20 @@ test("Snell law, normal incidence, and total internal reflection", () => {
 test("pixel-derived surface tracks two different true volumes", () => {
   const s = scenario("known"),
     w = worldFromScenario(s);
-  for (const v of [350, 850]) {
+  for (const v of [650, 850]) {
     w.volume = v;
     const f = extractFeatures(renderObservation(w, "side", s.seed, 0, `v${v}`));
     assert.notEqual(f.level, null);
     assert.ok(Math.abs(f.level! - liquidHeight(v, 0)) < 1);
   }
+});
+test("a surface hidden by the holder is not replaced by a pellet-shaped false boundary", () => {
+  const s = scenario("known"),
+    w = worldFromScenario(s);
+  w.volume = 350;
+  const packet = renderObservation(w, "side", s.seed, 0, "occluded");
+  assert.equal(extractFeatures(packet).level, null);
+  assert.ok(packet.valid.some((v) => v === 0));
 });
 test("duplicate correlated exposure cannot sharpen the posterior twice", () => {
   const s = scenario("known"),
@@ -142,4 +150,27 @@ test("trace import rejects malformed and oversized numeric state", () => {
   const t = runSimulation(scenario("missing"), policy("belief"));
   t.events[0].tip[0] = Infinity;
   assert.throws(() => validateTrace(t));
+});
+
+test("hardware validity mask covers every sampled interior point of each CAD holder", async () => {
+  const { hardwareOccluder } = await import("../src/model/occlusion");
+  const { fixtureDistance } = await import("../src/model/fixtureGeometry");
+  for (const tilt of [0, 5, 10] as const) {
+    const w = worldFromScenario(scenario("known"));
+    w.tilt = tilt;
+    w.fixture.tilt = tilt;
+    w.fixturePose = [0, 0, 0];
+    const mask = hardwareOccluder(w);
+    for (let x = -17; x <= 17; x += 1.3)
+      for (let y = -14; y <= 14; y += 1.7)
+        for (let z = -4; z < 18; z += 1.1) {
+          const p: [number, number, number] = [x, y, z];
+          if (fixtureDistance(p, w.fixture) < 0)
+            assert.equal(
+              mask(p),
+              true,
+              `unmasked hardware at ${p}, ${tilt} degrees`,
+            );
+        }
+  }
 });

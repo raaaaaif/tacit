@@ -1,6 +1,4 @@
 import { runSimulation } from "../model/simulation";
-import { worldFromScenario } from "../model/scenarios";
-import { renderObservation } from "../model/optics";
 import type {
   ScenarioSpec,
   PolicySpec,
@@ -9,7 +7,7 @@ import type {
 import { optimize } from "../model/optimization";
 self.onmessage = (
   event: MessageEvent<{
-    type: "run" | "preview" | "optimize";
+    type: "run" | "optimize";
     scenario: ScenarioSpec;
     policy: PolicySpec;
   }>,
@@ -19,17 +17,12 @@ self.onmessage = (
     const packets: ObservationPacket[] = [];
     if (type === "optimize") {
       const result = optimize(scenario, policy, 739, {
+        onEvaluation: (completed, total) =>
+          self.postMessage({ type: "search-evaluation", completed, total }),
         onProgress: (generation, candidate) =>
           self.postMessage({ type: "search-progress", generation, candidate }),
       });
       self.postMessage({ type: "search-done", result });
-      return;
-    }
-    if (type === "preview") {
-      const w = worldFromScenario(scenario);
-      for (const view of ["side", "overhead"] as const)
-        packets.push(renderObservation(w, view, scenario.seed, 0, "preview"));
-      self.postMessage({ type: "preview", packets });
       return;
     }
     const trace = runSimulation(scenario, policy, {

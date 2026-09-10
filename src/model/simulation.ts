@@ -143,7 +143,10 @@ export function runSimulation(
   }
   function observe(view: "side" | "overhead", why: string) {
     const group = `${view}-epoch-${aspirations}`;
-    const packet = renderObservation(world, view, s.seed, t + 0.7, group);
+    const packet = renderObservation(world, view, s.seed, t + 0.7, group, {
+      tip,
+      calibrationSigma: s.cameraBias,
+    });
     options.onObservation?.(packet);
     const updated = updateBelief(b, packet, s);
     b = updated.belief;
@@ -311,7 +314,10 @@ export function runSimulation(
       Math.max(0, (lowerVolume - immersedReserve) / (1 + 3 * s.pumpSigma)),
       Math.max(0, D.tip.capacity / (1 + 3 * s.pumpSigma) - commanded),
       p.controller === "belief" || p.controller === "oracle"
-        ? Math.max(0, (lowerVolume - 100) / (1 + 3 * s.pumpSigma))
+        ? Math.max(
+            0,
+            (lowerVolume - D.operating.minimumResidual) / (1 + 3 * s.pumpSigma),
+          )
         : Infinity,
     );
     if (requested < 3) {

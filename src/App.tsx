@@ -33,6 +33,7 @@ import { initialBelief } from "./model/belief";
 import { traceFile, readTraceFile } from "./model/traceFile";
 import { playbackState, packetAt, PARKED_TIP } from "./model/playback";
 import { CameraFrame } from "./components/CameraFrame";
+import { EvidenceReport } from "./components/EvidenceReport";
 import { SearchResults } from "./components/SearchResults";
 import type { SearchResult, Candidate } from "./model/optimization";
 import {
@@ -56,7 +57,7 @@ import type {
 type Mode = "run" | "investigate" | "design";
 function save(name: string, value: unknown, type = "application/json") {
   const blob = new Blob(
-    [typeof value === "string" ? value : JSON.stringify(value, null, 2)],
+    [typeof value === "string" ? value : JSON.stringify(value)],
     { type },
   );
   const a = document.createElement("a");
@@ -90,7 +91,7 @@ export default function App() {
     [report, setReport] = useState<ExperimentReport | null>(null),
     [exporting, setExporting] = useState(false),
     [searching, setSearching] = useState(false),
-    [searchGeneration, setSearchGeneration] = useState(0),
+    [searchEvaluations, setSearchEvaluations] = useState(0),
     [searchResult, setSearchResult] = useState<SearchResult | null>(null),
     [customPolicy, setCustomPolicy] = useState<PolicySpec | null>(null);
   const [importedRun, setImportedRun] = useState<{
@@ -100,7 +101,8 @@ export default function App() {
   const selectedPolicy =
     customPolicy?.controller === controller ? customPolicy : policy(controller);
   const worker = useRef<Worker | null>(null),
-    fileInput = useRef<HTMLInputElement>(null);
+    fileInput = useRef<HTMLInputElement>(null),
+    modal = useRef<HTMLElement>(null);
   const config = useMemo(() => {
     if (importedRun) return importedRun.trace.scenario;
     const s = scenario(scenarioId, seed);
@@ -118,8 +120,7 @@ export default function App() {
     w.onmessage = (e) => {
       const m = e.data;
       if (m.type === "progress") setProgress(m.progress);
-      if (m.type === "preview") setPackets(m.packets);
-      if (m.type === "search-progress") setSearchGeneration(m.generation);
+      if (m.type === "search-evaluation") setSearchEvaluations(m.completed);
       if (m.type === "search-done") {
         setSearchResult(m.result);
         setSearching(false);
@@ -158,11 +159,6 @@ export default function App() {
       setSearching(false);
       return () => w.terminate();
     }
-    w.postMessage({
-      type: "preview",
-      scenario: config,
-      policy: policy(controller),
-    });
     setPackets([]);
     setTrace(null);
     setTime(0);
@@ -174,7 +170,7 @@ export default function App() {
   useEffect(() => {
     fetch("/data/experiment.json")
       .then((r) => (r.ok ? r.json() : null))
-      .then(setReport)
+      .then((r) => setReport(r?.modelVersion === MODEL_VERSION ? r : null))
       .catch(() => {});
   }, []);
   useEffect(() => {
@@ -204,6 +200,41 @@ export default function App() {
     document.addEventListener("visibilitychange", hidden);
     return () => document.removeEventListener("visibilitychange", hidden);
   }, []);
+  useEffect(() => {
+    if (!about) return;
+    const previous = document.activeElement as HTMLElement | null;
+    setPlaying(false);
+    const focusables = () =>
+      Array.from(
+        modal.current?.querySelectorAll<HTMLElement>(
+          'button,a[href],input,select,[tabindex="0"]',
+        ) ?? [],
+      );
+    focusables()[0]?.focus({ preventScroll: true });
+    const trap = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setAbout(false);
+      }
+      if (e.key === "Tab") {
+        const all = focusables(),
+          first = all[0],
+          last = all.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", trap);
+    return () => {
+      document.removeEventListener("keydown", trap);
+      previous?.focus({ preventScroll: true });
+    };
+  }, [about]);
   const playback = trace ? playbackState(trace, time) : null;
   const currentIndex = playback?.index ?? 0;
   const current = playback?.event;
@@ -260,14 +291,14 @@ export default function App() {
     setBusy(true);
     setSearching(true);
     setPlaying(false);
-    setSearchGeneration(0);
+    setSearchEvaluations(0);
     worker.current?.postMessage({
       type: "optimize",
       scenario: config,
       policy: selectedPolicy,
     });
   }
-  function applyCandidate(c: Candidate) {
+  function applyCandidate(c: Pick<Candidate, "policy" | "tilt">) {
     setImportedRun(null);
     setCustomPolicy(c.policy);
     setController(c.policy.controller);
@@ -351,7 +382,8 @@ export default function App() {
   }
   async function importTrace(file: File) {
     try {
-      if (file.size > 5_000_000) throw Error("Trace exceeds the 5 MB limit.");
+      if (file.size > 25_000_000)
+        throw Error("Trace exceeds the 25 MB import limit.");
       const input = JSON.parse(await file.text());
       const bundle = readTraceFile(input),
         t = bundle.trace;
@@ -458,8 +490,8 @@ export default function App() {
                 </button>
                 <button
                   className={showBelief ? "on" : ""}
-                  aria-label="Toggle uncertainty overlay"
-                  title="Toggle uncertainty overlay"
+                  aria-label="Toggle pellet clearance envelope"
+                  title="Toggle pellet clearance envelope"
                   onClick={() => setShowBelief((v) => !v)}
                 >
                   <ScanLine size={16} />
@@ -696,7 +728,7 @@ export default function App() {
             {mode === "investigate" && (
               <>
                 <div className="investigate-intro">
-                  <h2>Every decision has a reason.</h2>
+                  <h2>Inspect the run</h2>
                   <p>
                     {trace
                       ? "Follow the evidence from observation to action. Select a moment on the timeline."
@@ -863,7 +895,7 @@ export default function App() {
                   <strong>34 × 28 mm</strong>
                 </div>
                 <div className="dimension-row">
-                  <span>Camera window</span>
+                  <span>Opening between columns</span>
                   <strong>{config.fixture.window} mm</strong>
                 </div>
                 <div className="design-actions">
@@ -878,7 +910,7 @@ export default function App() {
                       <SlidersHorizontal size={15} />
                     )}
                     {searching
-                      ? `Cancel search · generation ${searchGeneration}/3`
+                      ? `Cancel search · ${searchEvaluations}/32 candidates`
                       : "Search policy alternatives"}
                   </button>
                   <button
@@ -902,7 +934,7 @@ export default function App() {
                     ) : (
                       <Box size={15} />
                     )}
-                    Export holder STL + dimensions
+                    Export holder · STL + 3MF
                   </button>
                 </div>
                 <p className="fine-print">
@@ -1107,54 +1139,14 @@ export default function App() {
           </div>
         </section>
         {mode === "design" && (
-          <section className="benchmark">
-            <div>
-              <div className="eyebrow">HELD-OUT EVIDENCE</div>
-              <h2>Compare the tradeoffs.</h2>
-              <p>
-                Residual wash and execution time are reported alongside
-                constraint violations.
-              </p>
-            </div>
-            {report ? (
-              <div className="benchmark-table">
-                <div className="benchmark-row table-head">
-                  <span>Controller</span>
-                  <span>Residual</span>
-                  <span>Time</span>
-                  <span>Violations</span>
-                </div>
-                {report.summaries.map((s) => (
-                  <div className="benchmark-row" key={s.controller}>
-                    <span>
-                      {CONTROLLERS.find((c) => c.id === s.controller)?.short}
-                    </span>
-                    <strong>{s.meanRemaining.toFixed(0)} µL</strong>
-                    <span>{s.meanSeconds.toFixed(1)} s</span>
-                    <span>
-                      {(s.violationRate * 100).toFixed(1)}%{" "}
-                      <small>n={s.n}</small>
-                    </span>
-                  </div>
-                ))}
-                <button
-                  className="text-button"
-                  onClick={() => save("tacit-experiment.json", report)}
-                >
-                  Download methods and results
-                  <ArrowDownToLine size={14} />
-                </button>
-              </div>
-            ) : (
-              <div className="benchmark-pending">
-                <span className="mono">EVALUATION PENDING</span>
-                <p>
-                  Measured results will appear after the versioned experiment
-                  suite has completed. No estimated uplift is shown.
-                </p>
-              </div>
-            )}
-          </section>
+          <EvidenceReport
+            report={report}
+            onExport={() => save("tacit-experiment.json", report)}
+            onApply={(c) => {
+              applyCandidate(c);
+              setMode("run");
+            }}
+          />
         )}
         <footer>
           <span>
@@ -1174,7 +1166,7 @@ export default function App() {
               Source
               <Github size={14} />
             </a>
-            <span className="mono">v0.1</span>
+            <span className="mono">v0.3</span>
           </div>
         </footer>
       </main>
@@ -1199,6 +1191,7 @@ export default function App() {
       {about && (
         <div className="modal-backdrop" onClick={() => setAbout(false)}>
           <section
+            ref={modal}
             className="about-modal"
             role="dialog"
             aria-modal="true"
@@ -1216,9 +1209,9 @@ export default function App() {
               THE JUDGMENT BETWEEN INSTRUCTION AND ACTION
             </div>
             <h2 id="about-title">
-              Some knowledge lives
+              From a lab instruction
               <br />
-              in the doing.
+              to a physical action.
             </h2>
             <p>
               “Remove the wash without disturbing the pellet” leaves much

@@ -52,7 +52,7 @@ function fluidMesh(height: number, tilt: number) {
               D.tube.coneHeight) *
               Math.cos(a));
       const z = (surface * j) / m,
-        r = innerRadius(z);
+        r = Math.max(0,innerRadius(z)-.0125);
       positions.push(r * Math.cos(a), z, -r * Math.sin(a));
     }
   }
@@ -145,7 +145,7 @@ export function Workbench(props: Props) {
       new THREE.ShadowMaterial({ opacity: 0.16 }),
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -11.1;
+    ground.position.y = -12.8;
     ground.receiveShadow = true;
     scene.add(ground);
     const stage = new THREE.Group(),
@@ -296,11 +296,21 @@ export function Workbench(props: Props) {
     let lastFluidKey = "",
       lastHeld = -1,
       raf = 0;
+    let previousFrame=0, measuredFrames=0;
+    const intervals:number[]=[];
     function request() {
       if (!raf && !document.hidden)
         raf = requestAnimationFrame(() => {
           raf = 0;
           renderer.render(scene, camera);
+          const now=performance.now();
+          if(latest.current.active && previousFrame){
+            const dt=now-previousFrame;
+            if(dt<150)intervals.push(dt);
+            if(intervals.length>600)intervals.shift();
+            if(++measuredFrames%60===0){const sorted=[...intervals].sort((a,b)=>a-b);el.dataset.renderStats=JSON.stringify({frames:measuredFrames,medianFrameMs:sorted[Math.floor(sorted.length*.5)],p95FrameMs:sorted[Math.floor(sorted.length*.95)],geometries:renderer.info.memory.geometries,drawCalls:renderer.info.render.calls,pixelRatio:renderer.getPixelRatio()});}
+          }
+          previousFrame=latest.current.active?now:0;
         });
     }
     function update(p: Props) {

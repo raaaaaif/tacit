@@ -5,18 +5,16 @@ import type {
   PolicySpec,
   WorldState,
 } from "./types";
-import { defaultFixture, innerRadius } from "./geometry";
+import { D, defaultFixture, innerRadius } from "./geometry";
 import { normal, stream, clamp } from "./math";
 export const SCENARIOS: {
   id: ScenarioId;
   name: string;
   subtitle: string;
   description: string;
-  number: string;
 }[] = [
   {
     id: "known",
-    number: "01",
     name: "Known setup",
     subtitle: "A familiar procedure",
     description:
@@ -24,7 +22,6 @@ export const SCENARIOS: {
   },
   {
     id: "shifted",
-    number: "02",
     name: "Changed setup",
     subtitle: "Small changes. Real consequences.",
     description:
@@ -32,7 +29,6 @@ export const SCENARIOS: {
   },
   {
     id: "missing",
-    number: "03",
     name: "Missing context",
     subtitle: "When looking is not enough",
     description:
@@ -97,7 +93,7 @@ export function policy(controller: ControllerId): PolicySpec {
     margin: 1.8,
     surfaceDepth: 3.6,
     observeEvery: 2,
-    residualTarget: 85,
+    residualTarget: D.operating.bulkTarget,
   };
 }
 export function worldFromScenario(s: ScenarioSpec): WorldState {
