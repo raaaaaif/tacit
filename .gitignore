@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.venv/
+output/
+.DS_Store
+*.blend1
+work/
+.wrangler/
+*.tsbuildinfo
+.playwright-cli/

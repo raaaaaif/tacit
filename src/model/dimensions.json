@@ -1,0 +1,11 @@
+{
+  "revision": "nominal-tube-01",
+  "units": "mm",
+  "provenance": "Nominal research geometry, not a metrology-certified manufacturer replica. 1 mm³ = 1 µL.",
+  "tube": {"innerRadius":4.3,"innerBaseRadius":0.55,"coneHeight":11,"innerTop":32,"outerRadius":5.05,"wall":0.65,"lipRadius":5.7,"lipHeight":1.1,"capRadius":5.7,"capThickness":1.15},
+  "tip": {"apertureRadius":0.28,"shoulderRadius":3.1,"taperLength":46,"shaftRadius":3.7,"shaftLength":19,"capacity":1000},
+  "stage": {"maxVelocity":18,"acceleration":70,"xyLimit":30,"zMin":-1,"zMax":72},
+  "fluid": {"density":878.8,"surfaceTension":0.02735,"viscosity":0.0022249,"temperatureK":298,"ethanolMoleFraction":0.419,"gravity":9.81},
+  "holder": {"width":34,"depth":28,"baseHeight":3,"seatHeight":15,"seatClearance":0.35,"windowWidth":9},
+  "operating": {"flowRate":18,"settleTime":0.8,"pelletBuffer":1.8,"wallBuffer":0.2,"surfaceAllowance":1.85,"minimumResidual":65}
+}
