@@ -105,5 +105,6 @@ def main():
         fine['converged']=fine['volumeError']<.01 and fine['energyDrift']<1e-4 and fine['iterationDriftMm']<.1 and fine['meshDifferenceMm']<.25
         cases.append(fine);print(json.dumps(fine),flush=True)
     result={'version':1,'status':'verified' if all(c['converged'] for c in cases) and not args.smoke else 'incomplete','source':'Surface Evolver 2.70 / closed free-surface and wetted-wall mesh','cases':cases,'maxErrorMm':max(c['meshDifferenceMm'] for c in cases),'limitations':['Equilibrium reference only; no flow or adhesion.','No immersed tip in reference meshes; tip displacement handled by the interactive kernel.','Contact angles are assumed, not measured.','Mesh and iteration convergence are numerical checks, not empirical validation.']}
+    (ROOT/'public/data').mkdir(parents=True,exist_ok=True)
     (ROOT/'public/data/surface-reference.json').write_text(json.dumps(result,indent=2)+'\n')
 if __name__=='__main__':main()
