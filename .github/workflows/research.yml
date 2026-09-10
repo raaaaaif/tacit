@@ -1,0 +1,28 @@
+name: Independent reference calculations
+on:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: Single-case reference check
+        type: boolean
+        default: true
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install headless Surface Evolver
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends evolver-nox
+      - name: Compute equilibrium surfaces
+        run: python3 scripts/surface_reference.py ${{ inputs.smoke && '--smoke' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: surface-reference
+          path: |
+            public/data/surface-reference.json
+            work/surface-reference
+          retention-days: 3
