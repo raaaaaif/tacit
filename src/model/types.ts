@@ -152,6 +152,8 @@ export interface PolicySummary {
   secondsCI?: [number, number];
   violationRate: number;
   violationCI: [number, number];
+  declaredComplete?: number;
+  missedTargets?: number;
   completed: number;
   stopped: number;
   meanObservations: number;
@@ -164,6 +166,15 @@ export interface ExperimentReport {
   seeds: number[];
   summaries: PolicySummary[];
   optimizedSummaries?: PolicySummary[];
+  byScenario?: {
+    controller: ControllerId;
+    outcomes: {
+      scenario: ScenarioId;
+      baseline: PolicySummary;
+      optimized: PolicySummary;
+    }[];
+  }[];
+  selectedSearches?: import("./optimization").SearchResult[];
   policies?: { policy: PolicySpec; tilt: Tilt; optimizationSeed: number }[];
   stress: { n: number; rejected: number };
   notes: string[];

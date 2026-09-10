@@ -4,6 +4,10 @@ A physical reasoning workbench for laboratory automation. One task—remove wash
 
 Built by Raaif Bokhari as an independent project exploring scientific execution data and physical AI. It is a synthetic research workbench, not a biological validation study or a robot deployment.
 
+[Open the workbench](https://tacit-workbench.pages.dev) · [Model and evidence](https://tacit-workbench.pages.dev/docs/methods.html) · [Release review](docs/release-review.md)
+
+![TACIT physical reasoning workbench](docs/workbench.jpg)
+
 ## Run locally
 
 Use Node 24 (see `.nvmrc`).
@@ -39,7 +43,7 @@ npm run assets
 
 On macOS, the asset runner finds `/Applications/Blender.app`. Elsewhere it uses `blender` on PATH. Set `TACIT_BLENDER` to override the executable. Asset generation uses two CPU threads. The app itself does not need Blender installed.
 
-The GitHub Actions **Held-out controller evaluation** workflow runs the longer experiment in bounded hosted jobs. It uses three optimization seeds per controller, separate training/tuning/evaluation scenes, 512 held-out episodes per primary comparison and a separate 4,096-case geometric stress sample. The generated artifact includes individual episodes and complete-episode outcomes. Locally, a small diagnostic can use:
+The GitHub Actions **Held-out controller evaluation** workflow runs the longer experiment in bounded hosted jobs. It uses three optimization seeds per controller, separate training/tuning/evaluation scenes, 512 held-out episodes per primary comparison and a separate 4,096-case geometric stress sample. The generated artifact includes individual episodes and complete-episode outcomes. The published run is [34423472263](https://github.com/raaaaaif/tacit/actions/runs/34423472263). To package its downloaded `held-out-evidence` artifact, run `npx tsx scripts/prepare-evidence.ts <artifact-directory>`; this derives explicit target-attainment counts from recorded final states without rerunning or retuning controllers. Locally, a small diagnostic can use:
 
 ```sh
 npm run experiment -- --n 6 --controller nominal
@@ -58,6 +62,12 @@ The separate numerical check uses Python with SciPy:
 ```sh
 npx tsx scripts/numeric-cases.ts
 python3 scripts/numerical-check.py
+```
+
+The independent Blender image audit can be reproduced with Pillow installed:
+
+```sh
+python3 scripts/audit-reference.py
 ```
 
 ## Model and evidence

@@ -19,9 +19,9 @@
   ],
   "solidVolumeMm3": 4679.687396959434,
   "exportedTrace": {
-    "modelVersion": "tacit-0.2.0",
+    "modelVersion": "tacit-0.3.0",
     "events": 20,
     "cameraPackets": 5,
-    "massError": 1.1368683772161603e-13
+    "massError": 0.0
   }
 }

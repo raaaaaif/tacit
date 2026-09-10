@@ -1,6 +1,10 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { scenario, policy, CONTROLLERS } from "../src/model/scenarios";
 import { runSimulation } from "../src/model/simulation";
+import {
+  ASSESSMENT_VERSION,
+  TARGET_TOLERANCE_UL,
+} from "../src/model/assessment";
 import { MODEL_VERSION } from "../src/model/geometry";
 import { wilson, stream, quantile } from "../src/model/math";
 import { optimize } from "../src/model/optimization";
@@ -24,6 +28,7 @@ type Episode = {
   scenario: string;
   controller: string;
   seed: number;
+  target: number;
   remaining: number;
   seconds: number;
   status: string;
@@ -40,6 +45,7 @@ function evaluate(p: PolicySpec, tilt: Tilt, seeds: number[]): Episode[] {
       scenario: s.id,
       controller: p.controller,
       seed,
+      target: p.residualTarget,
       remaining: r.remaining,
       seconds: r.seconds,
       status: r.status,
@@ -72,7 +78,18 @@ function summarize(rows: Episode[]) {
     secondsCI: bootstrap("seconds"),
     violationRate: k / rows.length,
     violationCI: wilson(k, rows.length),
-    completed: rows.filter((r) => r.status === "completed").length,
+    declaredComplete: rows.filter((r) => r.status === "completed").length,
+    completed: rows.filter(
+      (r) =>
+        r.status === "completed" &&
+        r.remaining <= r.target + TARGET_TOLERANCE_UL &&
+        !r.violations.length,
+    ).length,
+    missedTargets: rows.filter(
+      (r) =>
+        r.status === "completed" &&
+        r.remaining > r.target + TARGET_TOLERANCE_UL,
+    ).length,
     stopped: rows.filter((r) => r.status === "stopped").length,
     meanObservations: mean("observations"),
   };
@@ -116,6 +133,7 @@ for (const c of CONTROLLERS.filter(
   const artifact = {
     version: 1,
     modelVersion: MODEL_VERSION,
+    assessmentVersion: ASSESSMENT_VERSION,
     sourceCommit: process.env.GITHUB_SHA ?? "local",
     controller: c.id,
     seeds: heldOut,

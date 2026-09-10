@@ -1,21 +1,36 @@
 import { useState } from "react";
 import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
 import { CONTROLLERS } from "../model/scenarios";
-import type { ExperimentReport, PolicySpec, Tilt } from "../model/types";
+import type {
+  ExperimentReport,
+  PolicySpec,
+  ScenarioId,
+  Tilt,
+} from "../model/types";
 export function EvidenceReport({
   report,
   onExport,
   onApply,
+  disabled = false,
 }: {
   report: ExperimentReport | null;
   onExport: () => void;
   onApply: (c: { policy: PolicySpec; tilt: Tilt }) => void;
+  disabled?: boolean;
 }) {
   const [optimized, setOptimized] = useState(false);
+  const [family, setFamily] = useState<"all" | ScenarioId>("all");
   const rows =
-    optimized && report?.optimizedSummaries
-      ? report.optimizedSummaries
-      : report?.summaries;
+    family !== "all" && report?.byScenario
+      ? report.byScenario.flatMap((r) => {
+          const outcome = r.outcomes.find((s) => s.scenario === family);
+          return outcome
+            ? [optimized ? outcome.optimized : outcome.baseline]
+            : [];
+        })
+      : optimized && report?.optimizedSummaries
+        ? report.optimizedSummaries
+        : report?.summaries;
   return (
     <section className="benchmark evidence-report">
       <div className="evidence-heading">
@@ -47,6 +62,23 @@ export function EvidenceReport({
       </div>
       {report && rows ? (
         <>
+          <div className="evidence-scope">
+            <label htmlFor="evidence-family">Scene family</label>
+            <select
+              id="evidence-family"
+              value={family}
+              onChange={(e) => setFamily(e.target.value as typeof family)}
+            >
+              <option value="all">All scenarios</option>
+              <option value="known">Known setup</option>
+              <option value="shifted">Changed setup</option>
+              <option value="missing">Missing context</option>
+            </select>
+            <span>
+              Means include every run, including stops. Target: ≤162 µL with no
+              recorded violation.
+            </span>
+          </div>
           <div className="evidence-scroll">
             <table className="evidence-table">
               <thead>
@@ -55,7 +87,7 @@ export function EvidenceReport({
                   <th>Wash remaining</th>
                   <th>Duration</th>
                   <th>Any violation</th>
-                  <th>Reached / stopped</th>
+                  <th>Completed / stopped</th>
                   {optimized && <th>Configuration</th>}
                 </tr>
               </thead>
@@ -70,7 +102,7 @@ export function EvidenceReport({
                       <strong>{s.meanRemaining.toFixed(0)} µL</strong>
                       {s.remainingCI && (
                         <small>
-                          {s.remainingCI.map((x) => x.toFixed(0)).join("–")} µL
+                          {s.remainingCI.map((x) => x.toFixed(1)).join("–")} µL
                         </small>
                       )}
                     </td>
@@ -93,14 +125,21 @@ export function EvidenceReport({
                     </td>
                     <td>
                       {s.completed} / {s.stopped}
+                      {!!s.missedTargets && (
+                        <small>
+                          {s.missedTargets} declared done but missed the target
+                        </small>
+                      )}
                       <small>
-                        {s.n - s.completed - s.stopped} halted with a violation
+                        {Math.round(s.violationRate * s.n)} halted with a
+                        violation
                       </small>
                     </td>
                     {optimized && (
                       <td>
                         <button
                           className="text-button"
+                          disabled={disabled}
                           onClick={() => {
                             const p = report.policies?.find(
                               (p) => p.policy.controller === s.controller,
@@ -137,10 +176,10 @@ export function EvidenceReport({
         </>
       ) : (
         <div className="benchmark-pending">
-          <span className="mono">EVALUATION RUNNING</span>
+          <span className="mono">EVIDENCE NOT LOADED</span>
           <p>
-            The versioned comparison will appear when its held-out evaluation
-            has finished.
+            The versioned comparison loads from this site's saved results.
+            Reload the page to retry if your connection was interrupted.
           </p>
         </div>
       )}

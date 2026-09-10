@@ -174,3 +174,17 @@ test("hardware validity mask covers every sampled interior point of each CAD hol
         }
   }
 });
+
+test("capacity exhaustion records a stop and cannot overfill a constrained reservoir", () => {
+  const capacity = D.tip.capacity;
+  try {
+    // Fault-injection check: constrain usable capacity without changing scene geometry.
+    D.tip.capacity = 250;
+    const run = runSimulation(scenario("known"), policy("oracle"));
+    assert.ok(run.result.removed <= 250);
+    assert.match(run.result.reason, /capacity/i);
+    assert.equal(run.result.status, "stopped");
+  } finally {
+    D.tip.capacity = capacity;
+  }
+});

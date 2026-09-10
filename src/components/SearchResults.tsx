@@ -1,13 +1,17 @@
 import type { SearchResult, Candidate } from "../model/optimization";
-import { ArrowUpRight, Check, Download } from "lucide-react";
+import { Check, Download } from "lucide-react";
 export function SearchResults({
   result,
   onApply,
   onExport,
+  applied = false,
+  disabled = false,
 }: {
   result: SearchResult;
   onApply: (c: Candidate) => void;
   onExport: () => void;
+  applied?: boolean;
+  disabled?: boolean;
 }) {
   const points = result.frontier.length ? result.frontier : [result.best];
   const maxX = Math.max(...points.map((p) => p.remaining), 200),
@@ -17,7 +21,11 @@ export function SearchResults({
   return (
     <section className="search-results">
       <div className="section-label">
-        <span>SEARCH RESULTS</span>
+        <span>
+          {result.provenance?.kind === "recorded"
+            ? "SAVED TRAINING SEARCH"
+            : "SEARCH RESULTS"}
+        </span>
         <span>{result.evaluations} evaluations</span>
       </div>
       <svg
@@ -56,6 +64,18 @@ export function SearchResults({
         Training cases only · seed {result.seed}. Test the selected
         configuration on a fresh scene before drawing a conclusion.
       </p>
+      <p className="search-method">
+        Withdrawals up to {result.best.policy.chunk.toFixed(0)} µL · immersion{" "}
+        {result.best.policy.surfaceDepth.toFixed(1)} mm · clearance{" "}
+        {result.best.policy.margin.toFixed(1)} mm · observe every{" "}
+        {result.best.policy.observeEvery} strokes.
+      </p>
+      <p className="search-method">
+        Across {result.trainingSeeds.length} training scenes:{" "}
+        {(result.best.violations * 100).toFixed(0)}% had a constraint violation;{" "}
+        {(result.best.stops * 100).toFixed(0)}% stopped conservatively. Amber
+        points have a violation.
+      </p>
       <div className="candidate-metrics">
         <div>
           <span>Residual</span>
@@ -77,10 +97,11 @@ export function SearchResults({
       <div className="export-buttons">
         <button
           className="secondary-button"
+          disabled={disabled || applied}
           onClick={() => onApply(result.best)}
         >
           <Check size={14} />
-          Apply candidate
+          {applied ? "Candidate applied" : "Apply candidate"}
         </button>
         <button
           className="secondary-button"

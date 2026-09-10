@@ -1,4 +1,5 @@
 import type { RunTrace } from "./types";
+import D from "./dimensions.json";
 export function validateTrace(value: unknown): RunTrace {
   const t = value as RunTrace;
   const fail = (
@@ -30,6 +31,8 @@ export function validateTrace(value: unknown): RunTrace {
     t.events.length > 1000
   )
     fail();
+  if (!["tacit-0.2.0", "tacit-0.3.0"].includes(t.modelVersion))
+    fail("This model revision is not supported by the current replay viewer.");
   const s = t.scenario,
     p = t.policy,
     w = t.initial,
@@ -39,8 +42,8 @@ export function validateTrace(value: unknown): RunTrace {
     f.version === 1 &&
     [0, 5, 10].includes(f.tilt) &&
     typeof f.indexed === "boolean" &&
-    number(f.window, 1, 50) &&
-    number(f.clearance, 0.01, 5) &&
+    [9, D.holder.windowWidth].includes(f.window) &&
+    f.clearance === D.holder.seatClearance &&
     number(f.seatingSigma, 0, 5);
   if (
     s.version !== 1 ||

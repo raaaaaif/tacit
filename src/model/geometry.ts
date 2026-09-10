@@ -214,9 +214,9 @@ export const defaultFixture: FixtureSpec = {
   version: 1,
   tilt: 0,
   indexed: true,
-  window: 9,
+  window: D.holder.windowWidth,
   seatingSigma: 0.15,
-  clearance: 0.35,
+  clearance: D.holder.seatClearance,
 };
 
 /** Conservative swept distance of every axial instrument section to the protected pellet. */

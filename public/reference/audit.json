@@ -21,7 +21,7 @@
         "pelletAngle": null,
         "pelletSigma": 0.55,
         "visiblePixels": 264,
-        "quality": 0.8169230769230769
+        "quality": 1
       },
       "levelErrorMm": 1.390312499534339
     },
@@ -44,7 +44,7 @@
         "pelletAngle": null,
         "pelletSigma": 0.55,
         "visiblePixels": 264,
-        "quality": 1
+        "quality": 0.974375
       },
       "levelErrorMm": 0.32406249953433885
     },

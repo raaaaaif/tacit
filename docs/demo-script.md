@@ -26,7 +26,7 @@ Go to Run → Missing context. Keep Belief-aware selected. Run it. Point out bot
 
 **2:05–2:40 — Design and evidence.**
 
-Return to Known setup. Open Design. Show the stationary 0°, 5° and 10° holders. The 10° equilibrium-reference case is unsupported and must not be presented as an improvement. Show the hosted held-out results once available. Interactive policy search is cancellable and its scatterplot is training-only; avoid waiting for a full search in the recording.
+Return to Known setup. Open Design. Show the stationary 0°, 5° and 10° holders. The 10° equilibrium-reference case is unsupported and must not be presented as an improvement. Show the held-out results. Filter to Known setup and switch between baseline and tuned policies: the belief-aware mean residual changes from 184 to 161 µL, with many conservative stops still retained. The saved training search is ready immediately; use Apply candidate and Test this configuration if you want a second run. Interactive policy search is cancellable and its scatterplot is training-only; avoid waiting for a full search in the recording.
 
 “The fixture changes the conditions under which a policy can act. Geometry, observation and the policy have to be evaluated together. The comparisons keep residual wash, time, violations and conservative stops separate.”
 

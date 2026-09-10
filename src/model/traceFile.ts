@@ -1,9 +1,18 @@
 import type { ObservationPacket, RunTrace } from "./types";
+import { ASSESSMENT_VERSION, targetMet } from "./assessment";
 import { validateTrace } from "./validation";
 
 export function traceFile(trace: RunTrace, packets: ObservationPacket[]) {
   return {
     ...trace,
+    assessment: {
+      version: ASSESSMENT_VERSION,
+      targetMet: targetMet(trace.result, trace.policy),
+      declaredComplete: trace.result.status === "completed",
+      complete:
+        trace.result.status === "completed" &&
+        targetMet(trace.result, trace.policy),
+    },
     cameraPackets: packets.map((p) => ({
       ...p,
       pixels: Array.from(p.pixels),

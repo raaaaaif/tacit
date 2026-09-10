@@ -9,6 +9,7 @@ import { runSimulation } from "../src/model/simulation";
 import { MODEL_VERSION, sweptClearance, toWorld } from "../src/model/geometry";
 import { stream } from "../src/model/math";
 import { traceFile } from "../src/model/traceFile";
+import { ASSESSMENT_VERSION } from "../src/model/assessment";
 import type { ObservationPacket } from "../src/model/types";
 const reports = CONTROLLERS.map((c) =>
   JSON.parse(readFileSync(`public/data/controller-${c.id}.json`, "utf8")),
@@ -17,7 +18,8 @@ if (
   reports.some(
     (r) =>
       r.modelVersion !== MODEL_VERSION ||
-      r.seeds.length !== reports[0].seeds.length,
+      r.sourceCommit !== reports[0].sourceCommit ||
+      JSON.stringify(r.seeds) !== JSON.stringify(reports[0].seeds),
   )
 )
   throw Error("Mixed experiment versions.");
@@ -37,6 +39,7 @@ for (let i = 0; i < 4096; i++) {
 const report = {
   version: 1,
   modelVersion: MODEL_VERSION,
+  assessmentVersion: ASSESSMENT_VERSION,
   sourceCommit: reports[0].sourceCommit,
   generatedAt: new Date().toISOString(),
   split:
@@ -45,6 +48,16 @@ const report = {
   summaries: reports.map((r) => r.baseline),
   optimizedSummaries: reports.map((r) => r.optimized),
   policies: reports.map((r) => r.chosen),
+  selectedSearches: reports.map((r) => ({
+    ...r.searches.find(
+      (s: { seed: number }) => s.seed === r.chosen.optimizationSeed,
+    ),
+    provenance: {
+      kind: "recorded",
+      sourceCommit: r.sourceCommit,
+      scope: "Known, changed and missing-context training families",
+    },
+  })),
   byScenario: reports.map((r) => ({
     controller: r.controller,
     outcomes: r.byScenario,

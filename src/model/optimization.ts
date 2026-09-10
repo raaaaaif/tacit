@@ -23,6 +23,11 @@ export interface Candidate {
 export interface SearchResult {
   version: 1;
   modelVersion: string;
+  provenance?: {
+    kind: "live" | "recorded";
+    sourceCommit?: string;
+    scope?: string;
+  };
   seed: number;
   evaluations: number;
   trainingSeeds: number[];

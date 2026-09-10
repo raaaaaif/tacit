@@ -10,6 +10,8 @@ The part I would most want to discuss with your team is where the workbench refu
 
 That is why Transfyr’s physical-AI and life-sciences direction interests me: preserving how scientific work is actually executed makes it possible to specify, evaluate and eventually automate it more faithfully. TACIT is a small example of how I approach the gap between a scientific workflow and the system that has to carry it out.
 
+Demo: https://tacit-workbench.pages.dev
+
 Source: https://github.com/raaaaaif/tacit
 
-Before submitting, add the published demo link and the short walkthrough video. Do not submit this application automatically; Raaif should review the final wording and choose the submission timing.
+Before submitting, add the short walkthrough video. Raaif should review the final wording and choose the submission timing.
