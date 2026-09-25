@@ -1,0 +1,39 @@
+{
+  "study": "readiness-study-2",
+  "frozenBeforeEvaluation": true,
+  "files": {
+    "src/model/assembly.ts": "dce51ff87070da57a764795a6f66fc78e7b71b948ab7f9d958d147e9824b8765",
+    "src/model/assessment.ts": "33e8a55ffe2b40ec3b88dca205a0dd5f273d3c9a1d408f499772e74d81cab313",
+    "src/model/belief.ts": "6218c33675b54338963001df054c8a49cd802b1b3495297ea0c818cc3d2b4c07",
+    "src/model/casePacket.ts": "a1c1572e7c1560798c69ea86a2d4cda5cb1e55eb8ab93179f20b8a68b8ce38c2",
+    "src/model/comparison.ts": "1846a60e1bb61f96d1c30130fcc29b41ed9746a392f8bc76eb33530d7b71dcbe",
+    "src/model/dimensions.json": "da29202e0077edd3e16c5456393a31b04322ab22eb66f86f0e00c0e237572eb2",
+    "src/model/evidence.ts": "cb5dbe562f778680ad665c683d835aaed5b2cbcb4d4663b25c33d72c092d6f3f",
+    "src/model/fixtureGeometry.ts": "434fea269e9cdb5d8667e3ef84e5eaf26fa67a346427c1a9b953a759baf64771",
+    "src/model/geometry.ts": "5d871c08911af2e274bf29088012af243ed56c0652133f36f03b70f605dbfc7c",
+    "src/model/math.ts": "3281be62c5b399a41497f71120674d49d5c20653e6fa8b7639196c4705630bff",
+    "src/model/occlusion.ts": "e16cc31c4979cdcbdd6f8794a65d1414c5e4dde3744077634369453f37a8db25",
+    "src/model/optics.ts": "0c54db6ecb0c5a70766ab76d4d51d517ba5fa5308d4878181a91d198f4fabcbc",
+    "src/model/optimization.ts": "1fc26237a4e2fc970a215104c340d549c02111fa1f4fa5b7d26eebf85bb6867e",
+    "src/model/playback.ts": "cc9640ea06b0f534c19f3e538f6fe0492711155c1f7163cd3e8e632bbc95cba0",
+    "src/model/policy.ts": "0bb9ee350286a6a10b1ddfb18f465825f29d5f8bbb372b9dcc499d1c4cc9151d",
+    "src/model/receiptValidation.ts": "29a54f65afdeca023cb2e5dfbc3e3ac1187c36986f30929553f876bb75b5ab5b",
+    "src/model/reference.ts": "85ebcf330913b0a53706bc1f06a7ed6bc3ce28a37db651ae47ffe8aa32a32c2f",
+    "src/model/scenarios.ts": "2568d44ec2ae1ad3262d7ac5779ca2bd891eb410f863eab2143932230f67f04b",
+    "src/model/simulation.ts": "6deb33a7e54e8a4c56b26b7e73657e0de5e24afddc4594e759a814f97b18e6d6",
+    "src/model/surface-reference.json": "6bc48829039be3a62f6a8d7509433629fa4982d749743bef4288b524f4908200",
+    "src/model/traceFile.ts": "db0182f4f101ae745d64173fe3f144cd44107f5dbf6b24d800cd2d561b9a8352",
+    "src/model/types.ts": "564a01b08c73d0cb16b4caa91c4bcd6b4894f8501a6d1eaf2bd9e9171b9695b5",
+    "src/model/validation.ts": "3070098661a65d66f85409035de5c4c277f8d8031ddbb3a8552f6e5cb07c509c",
+    "src/cad/fixture.ts": "c29375d2985cc5c1496cb30488f63f74525b59f28a3bb5ceaeacdc131e95fdb6",
+    "src/cad/solid.ts": "d5991bc9890715c18c1ffecd23730725567dba70ef06c1817eb6d1f7b4da85f2",
+    "scripts/readiness-study.ts": "485c928ab1a6fb94bd850f85d7cc4d90ca555bc830aa3c695189b3ff929d9789",
+    "package-lock.json": "8f73a1d22ffa0427f07d8032d74660e6fa565f1c4b04036b39fa1fb408040011"
+  },
+  "administrativeRestarts": [
+    {
+      "run": "study-2 initial attempt",
+      "reason": "Stopped during source review to complete bounded holder-seating uncertainty treatment. Partial log retained; entire assignment list rerun."
+    }
+  ]
+}

@@ -1,0 +1,607 @@
+{
+  "manifest": {
+    "kernel": "tacit-0.4.0",
+    "geometry": "nominal-assembly-02",
+    "collision": "swept-envelope-2",
+    "observation": "refractive-camera-2",
+    "extraction": "pixel-features-1",
+    "belief": "correlated-particles-1",
+    "policy": "readiness-policy-2",
+    "scenario": "physical-scene-2",
+    "streams": "keyed-scene-sensor-stroke-2",
+    "assessment": "target-attainment-1",
+    "support": "surface-0-5-100-950-1"
+  },
+  "kind": "internal generative-model coverage diagnostic; not a proof of calibrated inference",
+  "scope": "36 prespecified synthetic side views. No real images; model discrepancy is separate. Sensitivity uses development seed 1847 only.",
+  "cases": [
+    {
+      "family": "known",
+      "seed": 600001,
+      "trueVolume": 851.7304115599364,
+      "volume95": [
+        822.2091221433864,
+        900.6707639502579
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600042,
+      "trueVolume": 857.9755141581228,
+      "volume95": [
+        818.1083703823257,
+        894.8642414780928
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600083,
+      "trueVolume": 874.1711276917885,
+      "volume95": [
+        860.2800755391911,
+        932.1365858656523
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600124,
+      "trueVolume": 840.6906667855,
+      "volume95": [
+        835.4339622956297,
+        908.7235395934484
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600165,
+      "trueVolume": 872.2419880644059,
+      "volume95": [
+        837.1441227968135,
+        926.567372460701
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600206,
+      "trueVolume": 834.9796150004291,
+      "volume95": [
+        820.6947039020719,
+        886.1202365704938
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600247,
+      "trueVolume": 846.491042819579,
+      "volume95": [
+        820.3292126361451,
+        896.9268278547963
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600288,
+      "trueVolume": 854.7399802747997,
+      "volume95": [
+        830.2687918653885,
+        903.7938032598191
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600329,
+      "trueVolume": 858.8802139905498,
+      "volume95": [
+        829.1242205402359,
+        916.3610287591159
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600370,
+      "trueVolume": 858.6938087358319,
+      "volume95": [
+        844.7725543226577,
+        928.2532068652209
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600411,
+      "trueVolume": 838.3520100250227,
+      "volume95": [
+        816.0345483043047,
+        889.4006256864835
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "known",
+      "seed": 600452,
+      "trueVolume": 850.4785971793494,
+      "volume95": [
+        830.8703016148942,
+        898.0096535216178
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600001,
+      "trueVolume": 851.7304115599364,
+      "volume95": [
+        829.069372741783,
+        900.7554354701988
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600042,
+      "trueVolume": 857.9755141581228,
+      "volume95": [
+        818.4229257624235,
+        897.3927068963285
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600083,
+      "trueVolume": 874.1711276917885,
+      "volume95": [
+        858.1924141805232,
+        908.9505872155464
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600124,
+      "trueVolume": 840.6906667855,
+      "volume95": [
+        835.5599503472155,
+        873.2255155819162
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600165,
+      "trueVolume": 872.2419880644059,
+      "volume95": [
+        850.0740017478333,
+        932.0557832991442
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600206,
+      "trueVolume": 834.9796150004291,
+      "volume95": [
+        820.7055851212366,
+        872.4582010638576
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600247,
+      "trueVolume": 846.491042819579,
+      "volume95": [
+        818.1511927733557,
+        901.6114219405843
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600288,
+      "trueVolume": 854.7399802747997,
+      "volume95": [
+        823.3147347141876,
+        910.8242707397461
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600329,
+      "trueVolume": 858.8802139905498,
+      "volume95": [
+        832.7707271093083,
+        903.731255586998
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600370,
+      "trueVolume": 858.6938087358319,
+      "volume95": [
+        840.515903759199,
+        911.2277805954639
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600411,
+      "trueVolume": 838.3520100250227,
+      "volume95": [
+        805.7451830490395,
+        873.915184051516
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "shifted",
+      "seed": 600452,
+      "trueVolume": 850.4785971793494,
+      "volume95": [
+        825.8124942813351,
+        897.5064386834222
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600001,
+      "trueVolume": 851.7304115599364,
+      "volume95": [
+        817.4163940818701,
+        894.9066069897679
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600042,
+      "trueVolume": 857.9755141581228,
+      "volume95": [
+        817.006417622707,
+        912.6400228686725
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600083,
+      "trueVolume": 874.1711276917885,
+      "volume95": [
+        847.9201610943803,
+        928.0320285385772
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600124,
+      "trueVolume": 840.6906667855,
+      "volume95": [
+        823.3916743629463,
+        908.7235395934484
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600165,
+      "trueVolume": 872.2419880644059,
+      "volume95": [
+        841.501888191186,
+        910.9269716608912
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600206,
+      "trueVolume": 834.9796150004291,
+      "volume95": [
+        813.2264016704753,
+        891.7909410543468
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600247,
+      "trueVolume": 846.491042819579,
+      "volume95": [
+        815.4976955001036,
+        910.9441850188967
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600288,
+      "trueVolume": 854.7399802747997,
+      "volume95": [
+        826.718488150724,
+        902.5884153314634
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600329,
+      "trueVolume": 858.8802139905498,
+      "volume95": [
+        825.5541494680868,
+        900.5281738934256
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600370,
+      "trueVolume": 858.6938087358319,
+      "volume95": [
+        840.6808452449187,
+        933.4263227791597
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600411,
+      "trueVolume": 838.3520100250227,
+      "volume95": [
+        812.8199129617368,
+        888.4263473822548
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    },
+    {
+      "family": "missing",
+      "seed": 600452,
+      "trueVolume": 850.4785971793494,
+      "volume95": [
+        821.3676332654135,
+        901.2478255264971
+      ],
+      "covered": true,
+      "levelDetected": true,
+      "pelletDetected": false
+    }
+  ],
+  "sensitivity": [
+    {
+      "family": "known",
+      "setting": {
+        "id": "baseline",
+        "pump": 0.018,
+        "camera": 0.12
+      },
+      "removed": 579.6363301242459,
+      "residual": 256.295211789803,
+      "violations": [],
+      "blockers": [
+        "swept-hardware",
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "known",
+      "setting": {
+        "id": "pump-error-4pct",
+        "pump": 0.04,
+        "camera": 0.12
+      },
+      "removed": 577.4800385244079,
+      "residual": 258.45150338964095,
+      "violations": [],
+      "blockers": [
+        "swept-hardware",
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "known",
+      "setting": {
+        "id": "camera-bias-0.4mm",
+        "pump": 0.018,
+        "camera": 0.4
+      },
+      "removed": 578.4065886224189,
+      "residual": 257.52495329162997,
+      "violations": [],
+      "blockers": [
+        "swept-hardware",
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "shifted",
+      "setting": {
+        "id": "baseline",
+        "pump": 0.018,
+        "camera": 0.12
+      },
+      "removed": 524.523932311425,
+      "residual": 311.4076096026239,
+      "violations": [],
+      "blockers": [
+        "swept-hardware",
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "shifted",
+      "setting": {
+        "id": "pump-error-4pct",
+        "pump": 0.04,
+        "camera": 0.12
+      },
+      "removed": 525.1132959001264,
+      "residual": 310.8182460139224,
+      "violations": [],
+      "blockers": [
+        "swept-hardware",
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "shifted",
+      "setting": {
+        "id": "camera-bias-0.4mm",
+        "pump": 0.018,
+        "camera": 0.4
+      },
+      "removed": 501.6304101202526,
+      "residual": 334.30113179379634,
+      "violations": [],
+      "blockers": [
+        "swept-hardware",
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "missing",
+      "setting": {
+        "id": "baseline",
+        "pump": 0.018,
+        "camera": 0.12
+      },
+      "removed": 501.6304108922233,
+      "residual": 334.30113102182554,
+      "violations": [],
+      "blockers": [
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "missing",
+      "setting": {
+        "id": "pump-error-4pct",
+        "pump": 0.04,
+        "camera": 0.12
+      },
+      "removed": 496.568711824395,
+      "residual": 339.3628300896538,
+      "violations": [],
+      "blockers": [
+        "swept-pellet"
+      ],
+      "observations": 1
+    },
+    {
+      "family": "missing",
+      "setting": {
+        "id": "camera-bias-0.4mm",
+        "pump": 0.018,
+        "camera": 0.4
+      },
+      "removed": 459.0656166937341,
+      "residual": 376.8659252203147,
+      "violations": [],
+      "blockers": [
+        "swept-pellet"
+      ],
+      "observations": 1
+    }
+  ],
+  "summary": {
+    "covered": 36,
+    "n": 36,
+    "levelMisses": 0
+  },
+  "independentRenderer": {
+    "status": "historical retained audit; extractor unchanged",
+    "images": 5,
+    "maxLiquidErrorMm": 1.39,
+    "overheadPelletMisses": 2,
+    "overheadImages": 2
+  },
+  "physicalValidation": "not performed"
+}

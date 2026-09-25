@@ -45,9 +45,26 @@ export function fixtureSolid(module: ManifoldToplevel, spec: FixtureSpec) {
     ).translate([sx, 0, sz]),
   );
   const seat = keep(keep(shoulder.add(ring)).subtract(bore));
-  const parts = [base, ...posts, seat];
-  // A rear indexing fence marks the known centrifugation orientation; it does not recover history.
-  if (spec.indexed) parts.push(box([2, 4, 2], [sx, 5.7, sz + 0.2], spec.tilt));
+  // Flat tube-bottom datum, perpendicular to the tube axis. The guide bore
+  // limits lateral translation; it does not mechanically retain rotation.
+  const support = keep(
+    keep(
+      keep(
+        M.cylinder(
+          D.holder.supportTop - D.holder.supportBottom,
+          D.holder.supportRadius,
+          D.holder.supportRadius,
+          96,
+        ),
+      ).translate([0, 0, D.holder.supportBottom]),
+    ).rotate([0, spec.tilt, 0]),
+  );
+  const parts = [base, support, ...posts, seat];
+  // Visual orientation marker only. Cut the same bore through its local solid.
+  if (spec.indexed)
+    parts.push(
+      keep(box([2, 4, 2], [sx, 5.7, sz + 0.2], spec.tilt).subtract(bore)),
+    );
   const result = M.union(parts);
   owned.forEach((m) => m.delete());
   return result;

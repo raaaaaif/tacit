@@ -59,7 +59,13 @@ export function hardwareOccluder(world: WorldState, tip?: Vec3) {
           (r < 6.4 + padding && Math.abs(lz - 14) < 1.3 + padding))
       )
         return true;
-      if (world.fixture.indexed) {
+      if (
+        r < D.holder.supportRadius + padding &&
+        lz > D.holder.supportBottom - padding &&
+        lz < D.holder.supportTop + padding
+      )
+        return true;
+      if (world.fixture.indexed && r > bore) {
         const dx = x - sx,
           dz = z - sz - 0.2;
         if (

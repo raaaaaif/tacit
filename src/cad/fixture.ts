@@ -1,4 +1,5 @@
 import type { FixtureSpec } from "../model/types";
+import { ASSEMBLY, assemblySupported } from "../model/assembly";
 import D from "../model/dimensions.json";
 import { MODEL_VERSION } from "../model/geometry";
 import Module from "manifold-3d";
@@ -7,6 +8,10 @@ import { zipSync, strToU8 } from "fflate";
 import { fixtureSolid } from "./solid";
 let ready: ReturnType<typeof Module> | undefined;
 export async function exportFixture(spec: FixtureSpec) {
+  if (!assemblySupported(spec))
+    throw Error(
+      "Research geometry is available only for the computationally checked 0°/5° assemblies.",
+    );
   const module = await (ready ??= Module({ locateFile: () => wasmURL }).then(
     (m) => {
       m.setup();
@@ -66,6 +71,7 @@ export async function exportFixture(spec: FixtureSpec) {
     });
     const notes = {
       version: 1,
+      assembly: ASSEMBLY,
       modelVersion: MODEL_VERSION,
       fixture: {
         ...spec,
@@ -81,7 +87,7 @@ export async function exportFixture(spec: FixtureSpec) {
       triangleCount: n,
       status: result.status(),
       limitations:
-        "Nominal bench holder. Fit, retention, loading, cleanability and chemical compatibility are untested. Never use as a centrifuge component.",
+        "Research geometry — NOT FOR FABRICATION. Nominal computational assembly check only. Physical fit, retention, loading, cleanability and chemical compatibility are untested. Never use as a centrifuge component.",
     };
     const stem = `tacit-holder-${spec.tilt}deg`;
     const bundle = zipSync({

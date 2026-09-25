@@ -35,11 +35,12 @@ export function EvidenceReport({
     <section className="benchmark evidence-report">
       <div className="evidence-heading">
         <div>
-          <div className="eyebrow">HELD-OUT EVIDENCE</div>
-          <h2>Compare the tradeoffs.</h2>
+          <div className="eyebrow">HISTORICAL EVIDENCE · TACIT 0.3</div>
+          <h2>Keep the original findings.</h2>
           <p>
-            Whole episodes, including conservative stops. These are synthetic
-            engineering results.
+            The original 512-scene evaluation predates the assembly repair.
+            These saved results are retained under their original model; they do
+            not describe the current controller.
           </p>
         </div>
         {report && (
@@ -147,7 +148,7 @@ export function EvidenceReport({
                             if (p) onApply(p);
                           }}
                         >
-                          Use in workbench <ArrowUpRight size={13} />
+                          Historical configuration <ArrowUpRight size={13} />
                         </button>
                       </td>
                     )}
@@ -158,11 +159,12 @@ export function EvidenceReport({
           </div>
           <div className="evidence-footnote">
             <p>
-              Small figures are 95% confidence intervals: bootstrap for means,
-              Wilson for violations. A zero observed failure count is not a
-              zero-risk claim. {report.stress.n.toLocaleString()} separate
-              geometric stress cases; {report.stress.rejected.toLocaleString()}{" "}
-              paths rejected.
+              Aspiration exposure is unavailable in this aggregate view. Small
+              figures are 95% confidence intervals: bootstrap for means, Wilson
+              for violations. A zero observed failure count is not a zero-risk
+              claim. {report.stress.n.toLocaleString()} separate geometric
+              stress cases; {report.stress.rejected.toLocaleString()} paths
+              rejected.
             </p>
             <button className="text-button" onClick={onExport}>
               Export full report <ArrowDownToLine size={14} />

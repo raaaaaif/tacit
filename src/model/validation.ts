@@ -1,5 +1,7 @@
 import type { RunTrace } from "./types";
 import D from "./dimensions.json";
+import { validateReceiptShape } from "./receiptValidation";
+import { MANIFEST, canonical } from "./evidence";
 export function validateTrace(value: unknown): RunTrace {
   const t = value as RunTrace;
   const fail = (
@@ -31,8 +33,13 @@ export function validateTrace(value: unknown): RunTrace {
     t.events.length > 1000
   )
     fail();
-  if (!["tacit-0.2.0", "tacit-0.3.0"].includes(t.modelVersion))
+  if (!["tacit-0.2.0", "tacit-0.3.0", "tacit-0.4.0"].includes(t.modelVersion))
     fail("This model revision is not supported by the current replay viewer.");
+  if (
+    t.modelVersion === "tacit-0.4.0" &&
+    canonical(t.manifest) !== canonical(MANIFEST)
+  )
+    fail("Current trace manifest does not match its model revision.");
   const s = t.scenario,
     p = t.policy,
     w = t.initial,
@@ -61,7 +68,15 @@ export function validateTrace(value: unknown): RunTrace {
     fail("Unsupported scenario in trace.");
   if (
     p.version !== 1 ||
-    !["nominal", "estimate", "belief", "oracle"].includes(p.controller) ||
+    ![
+      "nominal",
+      "estimate",
+      "belief",
+      "oracle",
+      "progress",
+      "preflight",
+      "stop",
+    ].includes(p.controller) ||
     !number(p.chunk, 1, 1000) ||
     !number(p.margin, 0.01, 20) ||
     !number(p.surfaceDepth, 0.01, 40) ||
@@ -125,6 +140,15 @@ export function validateTrace(value: unknown): RunTrace {
       !["move", "observe", "aspirate", "stop"].includes(e.action.kind)
     )
       fail("Invalid event in the imported trace.");
+    if (e.receipt) {
+      validateReceiptShape(e.receipt);
+      if (
+        Math.abs(e.receipt.decisionAtS - e.t) > 1e-8 ||
+        canonical(e.receipt.action) !== canonical(e.action)
+      )
+        fail("Receipt and committed action disagree.");
+    } else if (t.modelVersion === "tacit-0.4.0")
+      fail("Current traces require original decision receipts.");
     const a = e.action;
     if (a.kind === "move" && !vector(a.to)) fail();
     if (

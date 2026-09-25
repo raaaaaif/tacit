@@ -5,7 +5,7 @@ import type {
   PolicySpec,
   WorldState,
 } from "./types";
-import { D, defaultFixture, innerRadius } from "./geometry";
+import { D, defaultFixture, innerRadius, toWorld } from "./geometry";
 import { normal, stream, clamp } from "./math";
 export const SCENARIOS: {
   id: ScenarioId;
@@ -42,6 +42,20 @@ export const CONTROLLERS: {
   description: string;
 }[] = [
   {
+    id: "progress",
+    label: "Readiness controller",
+    short: "Readiness",
+    description:
+      "Tests bounded progress, then asks whether another view would change the decision.",
+  },
+  {
+    id: "preflight",
+    label: "Fixed + preflight",
+    short: "Preflight",
+    description:
+      "One fixed path with the same uncertainty checks; stops when they do not pass.",
+  },
+  {
     id: "nominal",
     label: "Fixed procedure",
     short: "Fixed",
@@ -64,7 +78,7 @@ export const CONTROLLERS: {
     label: "Hidden-state reference",
     short: "Reference",
     description:
-      "Receives simulation truth. An explanatory upper reference, not an observed controller.",
+      "Receives simulation truth. A finite-search privileged reference, not an observed controller.",
   },
 ];
 export function scenario(id: ScenarioId, seed = 1847): ScenarioSpec {
@@ -117,9 +131,10 @@ export function worldFromScenario(s: ScenarioSpec): WorldState {
     (s.fixture.clearance * 0.8) / (Math.hypot(...offset) || 1),
   );
   const pose: [number, number, number] = [
-    fixturePose[0] + offset[0] * scale,
+    fixturePose[0] +
+      offset[0] * scale * Math.cos((s.fixture.tilt * Math.PI) / 180),
     fixturePose[1] + offset[1] * scale,
-    0,
+    -offset[0] * scale * Math.sin((s.fixture.tilt * Math.PI) / 180),
   ];
   const angle =
     s.historyKnown && s.fixture.indexed

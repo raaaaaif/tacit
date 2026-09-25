@@ -15,7 +15,12 @@ const read = (name: string) =>
   JSON.parse(readFileSync(`public/data/${name}.json`, "utf8"));
 test("published outcomes partition all paired held-out episodes and exclude missed targets", () => {
   const combined = read("experiment");
-  assert.equal(combined.modelVersion, MODEL_VERSION);
+  assert.equal(combined.modelVersion, "tacit-0.3.0");
+  assert.notEqual(
+    combined.modelVersion,
+    MODEL_VERSION,
+    "historical evidence must retain its original model identity",
+  );
   assert.equal(combined.assessmentVersion, ASSESSMENT_VERSION);
   assert.equal(combined.stress.n, 4096);
   for (const id of [

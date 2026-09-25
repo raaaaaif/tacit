@@ -28,6 +28,12 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import { DecisionReceipt } from "./components/DecisionReceipt";
+import { ControlledComparison } from "./components/ControlledComparison";
+import { EvidenceLedger } from "./components/EvidenceLedger";
+import { casePacket, readCaseOrTrace } from "./model/casePacket";
+import { ASSEMBLY } from "./model/assembly";
+import type { Comparison, Intervention, Arm } from "./model/comparison";
 import { Workbench } from "./scene/Workbench";
 import { targetMet, outcomeReason } from "./model/assessment";
 import { initialBelief } from "./model/belief";
@@ -71,7 +77,7 @@ const format = (n: number) => Math.round(n).toLocaleString();
 export default function App() {
   const [mode, setMode] = useState<Mode>("run"),
     [scenarioId, setScenario] = useState<ScenarioId>("known"),
-    [controller, setController] = useState<ControllerId>("belief"),
+    [controller, setController] = useState<ControllerId>("progress"),
     [seed, setSeed] = useState(1847),
     [tilt, setTilt] = useState<Tilt>(0),
     [indexed, setIndexed] = useState(true),
@@ -95,6 +101,10 @@ export default function App() {
     [searchEvaluations, setSearchEvaluations] = useState(0),
     [searchResult, setSearchResult] = useState<SearchResult | null>(null),
     [customPolicy, setCustomPolicy] = useState<PolicySpec | null>(null);
+  const [comparison, setComparison] = useState<Comparison | null>(null);
+  const [comparing, setComparing] = useState(false);
+  const [geometryOpen, setGeometryOpen] = useState(false);
+  const jobId = useRef(0);
   const [importedRun, setImportedRun] = useState<{
     trace: RunTrace;
     packets: ObservationPacket[];
@@ -102,11 +112,7 @@ export default function App() {
   const selectedPolicy =
     customPolicy?.controller === controller ? customPolicy : policy(controller);
   const displayedSearch =
-    searchResult?.best.policy.controller === controller
-      ? searchResult
-      : report?.selectedSearches?.find(
-          (s) => s.best.policy.controller === controller,
-        );
+    searchResult?.best.policy.controller === controller ? searchResult : null;
   const worker = useRef<Worker | null>(null),
     fileInput = useRef<HTMLInputElement>(null),
     modal = useRef<HTMLElement>(null);
@@ -127,6 +133,13 @@ export default function App() {
     );
     w.onmessage = (e) => {
       const m = e.data;
+      if (worker.current !== w || m.jobId !== jobId.current) return;
+      if (m.type === "comparison-done") {
+        setComparison(m.result);
+        setComparing(false);
+        setBusy(false);
+        return;
+      }
       if (m.type === "progress") setProgress(m.progress);
       if (m.type === "search-evaluation") setSearchEvaluations(m.completed);
       if (m.type === "search-done") {
@@ -141,16 +154,20 @@ export default function App() {
         setSearching(false);
         setTime(0);
         setPlaying(
-          !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+          !document.hidden &&
+            !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         );
       }
       if (m.type === "error") {
         setSearching(false);
+        setComparing(false);
         setError(m.message);
         setBusy(false);
       }
     };
     w.onerror = (e) => {
+      if (worker.current !== w) return;
+      setComparing(false);
       setSearching(false);
       setError(e.message);
       setBusy(false);
@@ -163,7 +180,7 @@ export default function App() {
     if (importedRun) {
       setTrace(importedRun.trace);
       setPackets(importedRun.packets);
-      setTime(0);
+      setTime(importedRun.trace.result.seconds);
       setPlaying(false);
       setBusy(false);
       setSearching(false);
@@ -175,12 +192,13 @@ export default function App() {
     setPlaying(false);
     setBusy(false);
     setSearching(false);
+    setComparing(false);
     return () => w.terminate();
   }, [config]);
   useEffect(() => {
     fetch("/data/experiment.json")
       .then((r) => (r.ok ? r.json() : null))
-      .then((r) => setReport(r?.modelVersion === MODEL_VERSION ? r : null))
+      .then((r) => setReport(r?.modelVersion ? r : null))
       .catch(() => {});
   }, []);
   useEffect(() => {
@@ -260,8 +278,10 @@ export default function App() {
     [trace, initial, visibleVolume, config.fixture, tilt],
   );
   const finished = !!trace && time >= trace.result.seconds;
+  const hasViolations = !!trace?.result.violations.length;
   const missedTarget =
     !!trace &&
+    !hasViolations &&
     trace.result.status === "completed" &&
     !targetMet(trace.result, trace.policy);
   const stateLabel = busy
@@ -271,11 +291,11 @@ export default function App() {
         ? "Saved replay"
         : "Playing run"
       : finished
-        ? trace?.result.status === "completed"
+        ? !hasViolations && trace?.result.status === "completed"
           ? missedTarget
             ? "Target not met"
             : "Target reached"
-          : trace?.result.status === "violated"
+          : hasViolations || trace?.result.status === "violated"
             ? "Run halted"
             : "Stopped"
         : trace
@@ -291,16 +311,65 @@ export default function App() {
     setPlaying(false);
     worker.current?.postMessage({
       type: "run",
+      jobId: ++jobId.current,
       scenario: config,
       policy: selectedPolicy,
     });
   };
   function cancel() {
+    ++jobId.current;
+    setComparing(false);
     worker.current?.terminate();
     createWorker();
     setBusy(false);
     setProgress(0);
     setSearching(false);
+  }
+  function runPair(kind: Intervention) {
+    if (busy) return;
+    setBusy(true);
+    setComparing(true);
+    setProgress(0);
+    setError("");
+    setPlaying(false);
+    worker.current?.postMessage({
+      type: "compare",
+      jobId: ++jobId.current,
+      scenario: config,
+      policy: selectedPolicy,
+      intervention: kind,
+    });
+  }
+  function inspectArm(a: Arm) {
+    const t = {
+      ...a.trace,
+      provenance: { ...a.trace.provenance, kind: "recorded" as const },
+    };
+    setScenario(t.scenario.id);
+    setSeed(t.scenario.seed);
+    setTilt(t.scenario.fixture.tilt);
+    setIndexed(t.scenario.fixture.indexed);
+    setController(t.policy.controller);
+    setCustomPolicy(t.policy);
+    setImportedRun({ trace: t, packets: a.packets });
+    setMode("investigate");
+  }
+  async function exportCase(paired = false) {
+    const t = paired ? comparison?.arms[0].trace : trace,
+      ps = paired ? comparison?.arms[0].packets : packets;
+    if (!t || !ps) return;
+    try {
+      save(
+        `${t.id}-case.json`,
+        await casePacket(t, ps, paired ? comparison : null),
+      );
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+  function selectDecision(t: number) {
+    setPlaying(false);
+    setTime(t);
   }
   function searchPolicies() {
     setError("");
@@ -310,6 +379,7 @@ export default function App() {
     setSearchEvaluations(0);
     worker.current?.postMessage({
       type: "optimize",
+      jobId: ++jobId.current,
       scenario: config,
       policy: selectedPolicy,
     });
@@ -405,7 +475,7 @@ export default function App() {
       if (file.size > 25_000_000)
         throw Error("Trace exceeds the 25 MB import limit.");
       const input = JSON.parse(await file.text());
-      const bundle = readTraceFile(input),
+      const bundle = await readCaseOrTrace(input),
         t = bundle.trace;
       setError("");
       setPlaying(false);
@@ -415,6 +485,7 @@ export default function App() {
       setIndexed(t.scenario.fixture.indexed);
       setController(t.policy.controller);
       setCustomPolicy(t.policy);
+      setComparison(bundle.comparison);
       setImportedRun(bundle);
       setMode("investigate");
     } catch (e) {
@@ -434,7 +505,7 @@ export default function App() {
             TACIT<span className="brand-period">.</span>
           </span>
           <span className="brand-description">
-            PHYSICAL REASONING
+            EXECUTION READINESS
             <br />
             WORKBENCH
           </span>
@@ -472,14 +543,56 @@ export default function App() {
               RNA ISOLATION <span>/</span> THE EXECUTION LAYER
             </div>
             <h1>
-              Remove the wash. <span>Preserve the pellet.</span>
+              Remove the wash. <span>Know what permits the next step.</span>
             </h1>
           </div>
           <button className="text-button" onClick={() => setAbout(true)}>
             Why this task <ArrowUpRight size={15} />
           </button>
         </div>
-        <div className="workbench-layout">
+        <div className="readiness-strip">
+          <span>
+            <i /> Synthetic research model
+          </span>
+          <span>
+            {tilt === 10
+              ? "Model domain unsupported"
+              : "0° / 5° · 100–950 µL screening"}
+          </span>
+          <span>Nominal assembly checked · not physically validated</span>
+        </div>
+        {mode === "design" && (
+          <div id="paired-experiment">
+            <ControlledComparison
+              historyKnown={config.historyKnown}
+              comparison={comparison}
+              busy={comparing}
+              disabled={busy && !comparing}
+              progress={progress}
+              onRun={runPair}
+              onCancel={cancel}
+              onInspect={inspectArm}
+              onExport={() => void exportCase(true)}
+            />
+            <EvidenceLedger />
+          </div>
+        )}
+        {mode === "design" && (
+          <button
+            className="geometry-toggle secondary-button"
+            aria-expanded={geometryOpen}
+            onClick={() => setGeometryOpen((v) => !v)}
+          >
+            {geometryOpen ? "Hide" : "Inspect"} workcell & research geometry{" "}
+            <ChevronDown size={15} />
+          </button>
+        )}
+        <div
+          className="workbench-layout"
+          style={
+            mode === "design" && !geometryOpen ? { display: "none" } : undefined
+          }
+        >
           <section className="viewport" aria-label="Physical workcell">
             <div className="viewport-top">
               <div className="viewport-id">
@@ -525,16 +638,27 @@ export default function App() {
                 </button>
               </div>
             </div>
-            <Workbench
-              world={visibleWorld}
-              overview={overview}
-              aspirated={playback?.aspirated ?? 0}
-              tip={tip}
-              cutaway={cutaway}
-              showBelief={showBelief}
-              reset={reset}
-              active={playing}
-            />
+            {trace && trace.modelVersion !== MODEL_VERSION ? (
+              <div className="historical-scene">
+                <h2>Historical evidence, preserved.</h2>
+                <p>
+                  {trace.modelVersion} uses a different assembly. Its recorded
+                  pixels and events remain available; current geometry is not
+                  substituted for an exact replay.
+                </p>
+              </div>
+            ) : (
+              <Workbench
+                world={visibleWorld}
+                overview={overview}
+                aspirated={playback?.aspirated ?? 0}
+                tip={tip}
+                cutaway={cutaway}
+                showBelief={showBelief}
+                reset={reset}
+                active={playing}
+              />
+            )}
             <div className="scene-side-label">
               <span className="vertical-rule" />
               <span className="mono">NOMINAL 1.5 mL / PP</span>
@@ -559,7 +683,10 @@ export default function App() {
                 </span>
               </div>
               <span className="model-label">
-                EXPLANATORY 3D <span>≠</span> CAMERA EVIDENCE
+                EVALUATION TRUTH <span>·</span>{" "}
+                {controller === "oracle"
+                  ? "PRIVILEGED REFERENCE ACCESS"
+                  : "NOT AVAILABLE TO CONTROLLER"}
               </span>
             </div>
             <div className="volume-readout">
@@ -606,6 +733,7 @@ export default function App() {
                   <label htmlFor="scenario">SCENARIO</label>
                   <div className="select-wrap">
                     <select
+                      disabled={busy}
                       id="scenario"
                       value={scenarioId}
                       onChange={(e) => {
@@ -680,6 +808,46 @@ export default function App() {
                     </button>
                   </div>
                 )}
+                <div className="available-context">
+                  <span>AVAILABLE TO THE CONTROLLER</span>
+                  <b>
+                    {controller === "oracle"
+                      ? "Hidden state · privileged diagnostic"
+                      : controller === "nominal"
+                        ? "Procedure assumptions · no camera update"
+                        : config.historyKnown &&
+                            trace?.intervention?.history !== "withheld"
+                          ? "Handling record + synthetic cameras"
+                          : "Synthetic cameras · history absent"}
+                  </b>
+                  <small>
+                    Target: 150 µL remaining. Final pellet-adjacent removal is
+                    outside this model.
+                  </small>
+                </div>
+                {trace && !finished && current && (
+                  <div className="live-decision">
+                    <b>
+                      {current.action.kind === "observe"
+                        ? "Observe the " + current.action.view + " view"
+                        : current.action.kind === "move"
+                          ? current.receipt?.disposition ===
+                            "comparator-unchecked"
+                            ? "Follow the comparator approach"
+                            : "Move along the checked approach"
+                          : current.action.kind === "aspirate"
+                            ? `Withdraw ${current.action.volume.toFixed(0)} µL`
+                            : "Stop and retain liquid"}
+                    </b>
+                    <span>
+                      {current.receipt?.disposition === "comparator-unchecked"
+                        ? "Comparator action · recorded checks do not gate this action."
+                        : current.action.kind === "aspirate"
+                          ? "The complete stroke was screened for immersion, capacity and model support."
+                          : current.reason}
+                    </span>
+                  </div>
+                )}
                 <div className="run-controls">
                   <button
                     className="primary-button"
@@ -710,7 +878,11 @@ export default function App() {
                     ) : (
                       <>
                         <Play size={17} fill="currentColor" />
-                        {trace ? "Run again" : "Run procedure"}
+                        {trace
+                          ? trace.modelVersion !== MODEL_VERSION
+                            ? "Rerun under current model"
+                            : "Run again"
+                          : "Run procedure"}
                         <span>SPACE</span>
                       </>
                     )}
@@ -719,18 +891,26 @@ export default function App() {
                 {finished && (
                   <div className="run-outcome" role="status">
                     <strong>
-                      {trace.result.status === "completed"
+                      {!hasViolations && trace.result.status === "completed"
                         ? missedTarget
                           ? "Target not met in simulation"
                           : "Bulk-removal target reached"
-                        : trace.result.status === "violated"
+                        : hasViolations || trace.result.status === "violated"
                           ? "Execution halted"
                           : "Stopped with liquid retained"}
                     </strong>
-                    <p>{outcomeReason(trace)}</p>
+                    <p>
+                      {hasViolations
+                        ? `Recorded violations: ${trace.result.violations.join(", ")}. ${trace.result.reason}`
+                        : outcomeReason(trace)}
+                    </p>
                     <button
                       className="text-button"
-                      onClick={() => setMode("investigate")}
+                      onClick={() => {
+                        setMode("investigate");
+                        setPlaying(false);
+                        setTime(trace!.result.seconds);
+                      }}
                     >
                       Inspect this decision <ArrowRight size={14} />
                     </button>
@@ -786,29 +966,16 @@ export default function App() {
                 </div>
                 {trace ? (
                   <>
-                    <div className="decision-card">
-                      <div className="eyebrow">
-                        DECISION {currentIndex + 1}{" "}
-                        <span>/ {trace.events.length}</span>
-                      </div>
-                      <h3>
-                        {current?.action.kind === "stop"
-                          ? "Stop and retain liquid"
-                          : current?.action.kind === "observe"
-                            ? "Acquire evidence"
-                            : current?.action.kind === "move"
-                              ? "Position the instrument"
-                              : "Withdraw wash liquid"}
-                      </h3>
-                      <p>
-                        {current?.action.kind === "stop"
-                          ? outcomeReason(trace)
-                          : current?.reason}
-                      </p>
-                    </div>
+                    <DecisionReceipt
+                      event={current}
+                      trace={trace}
+                      onSelect={selectDecision}
+                      onCompare={() => setMode("design")}
+                      onExport={() => void exportCase()}
+                    />
                     <div className="evidence-values">
                       <div>
-                        <span>Liquid estimate · 95% interval</span>
+                        <span>Liquid estimate · marginal 95% interval</span>
                         <strong>
                           {(playback?.belief ?? initialEstimate).volume
                             .map(format)
@@ -887,125 +1054,143 @@ export default function App() {
             {mode === "design" && (
               <>
                 <div className="investigate-intro">
-                  <h2>Configure the workcell.</h2>
+                  <h2>What changes the decision?</h2>
                   <p>
-                    The holder changes access and observability. Its benefit
-                    must survive the physical constraints.
+                    Compare context, observations or policy under the same
+                    physical conditions. Inspect both real reruns below.
                   </p>
                 </div>
-                <div className="design-field">
-                  <label>HOLDER INCLINATION</label>
-                  <div className="tilt-selector">
-                    {([0, 5, 10] as Tilt[]).map((v) => (
-                      <button
-                        key={v}
-                        onClick={() => {
-                          setImportedRun(null);
-                          setTilt(v);
-                        }}
-                        className={tilt === v ? "selected" : ""}
-                      >
-                        <span
-                          className="tilt-glyph"
-                          style={{ transform: `rotate(${v}deg)` }}
-                        />
-                        {v}°
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <label className="toggle-field">
-                  <span>
-                    <b>Orientation index</b>
-                    <small>Preserves known handling history</small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={indexed}
-                    onChange={(e) => {
-                      setImportedRun(null);
-                      setIndexed(e.target.checked);
-                    }}
-                  />
-                  <span className="toggle" />
-                </label>
                 <div className="design-note">
                   <Info size={15} />
                   <p>
-                    A keyed holder cannot recover a lost centrifugation record.
-                    Seating accuracy is an assumption until physically measured.
+                    The selected scene stays physically identical across
+                    information interventions. A new holder configuration starts
+                    a new physical run.
                   </p>
                 </div>
-                <div className="dimension-row">
-                  <span>Seat clearance</span>
-                  <strong>{config.fixture.clearance.toFixed(2)} mm</strong>
-                </div>
-                <div className="dimension-row">
-                  <span>Nominal footprint</span>
-                  <strong>34 × 28 mm</strong>
-                </div>
-                <div className="dimension-row">
-                  <span>Opening between columns</span>
-                  <strong>{D.holder.windowWidth} mm</strong>
-                </div>
-                <div className="design-actions">
-                  <button
-                    className="secondary-button"
-                    onClick={searching ? cancel : searchPolicies}
-                    disabled={busy && !searching}
-                  >
-                    {searching ? (
-                      <LoaderCircle size={15} className="spin" />
-                    ) : (
-                      <SlidersHorizontal size={15} />
-                    )}
-                    {searching
-                      ? `Cancel search · ${searchEvaluations}/32 candidates`
-                      : "Search policy alternatives"}
-                  </button>
-                  <button
-                    className="primary-button"
-                    disabled={busy}
-                    onClick={() => {
-                      setMode("run");
-                      run();
-                    }}
-                  >
-                    <Play size={16} />
-                    Test this configuration
-                    <ArrowRight size={16} />
-                  </button>
-                  <button
-                    className="secondary-button"
-                    disabled={exporting}
-                    onClick={exportCAD}
-                  >
-                    {exporting ? (
-                      <LoaderCircle size={15} className="spin" />
-                    ) : (
-                      <Box size={15} />
-                    )}
-                    Export holder · STL + 3MF
-                  </button>
-                </div>
-                <p className="fine-print">
-                  Untested bench fixture. Nominal geometry. Verify fit before
-                  fabrication.
-                </p>
-                {displayedSearch && (
-                  <SearchResults
-                    result={displayedSearch}
-                    disabled={busy}
-                    applied={
-                      customPolicy === displayedSearch.best.policy &&
-                      tilt === displayedSearch.best.tilt
-                    }
-                    onApply={applyCandidate}
-                    onExport={() =>
-                      save("tacit-policy-search.json", displayedSearch)
-                    }
-                  />
-                )}
+                <a
+                  className="primary-button comparison-jump"
+                  href="#paired-experiment"
+                >
+                  Open controlled experiment <ArrowRight size={16} />
+                </a>
+                <details className="fixture-drawer">
+                  <summary>Research geometry & advanced search</summary>
+                  <div className="design-field">
+                    <label>HOLDER INCLINATION</label>
+                    <div className="tilt-selector">
+                      {([0, 5, 10] as Tilt[]).map((v) => (
+                        <button
+                          key={v}
+                          onClick={() => {
+                            setImportedRun(null);
+                            setTilt(v);
+                          }}
+                          className={tilt === v ? "selected" : ""}
+                        >
+                          <span
+                            className="tilt-glyph"
+                            style={{ transform: `rotate(${v}deg)` }}
+                          />
+                          {v}°
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <label className="toggle-field">
+                    <span>
+                      <b>Visual orientation marker</b>
+                      <small>Reference marker · no mechanical key</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={indexed}
+                      onChange={(e) => {
+                        setImportedRun(null);
+                        setIndexed(e.target.checked);
+                      }}
+                    />
+                    <span className="toggle" />
+                  </label>
+                  <div className="design-note">
+                    <Info size={15} />
+                    <p>
+                      A visual marker cannot reconstruct handling history or
+                      mechanically retain rotation. Seating accuracy is an
+                      assumption until physically measured.
+                    </p>
+                  </div>
+                  <div className="dimension-row">
+                    <span>Seat clearance</span>
+                    <strong>{config.fixture.clearance.toFixed(2)} mm</strong>
+                  </div>
+                  <div className="dimension-row">
+                    <span>Nominal footprint</span>
+                    <strong>34 × 28 mm</strong>
+                  </div>
+                  <div className="dimension-row">
+                    <span>Opening between columns</span>
+                    <strong>{D.holder.windowWidth} mm</strong>
+                  </div>
+                  <div className="design-actions">
+                    <button
+                      className="secondary-button"
+                      onClick={searching ? cancel : searchPolicies}
+                      disabled={busy && !searching}
+                    >
+                      {searching ? (
+                        <LoaderCircle size={15} className="spin" />
+                      ) : (
+                        <SlidersHorizontal size={15} />
+                      )}
+                      {searching
+                        ? `Cancel search · ${searchEvaluations}/32 candidates`
+                        : "Search policy alternatives"}
+                    </button>
+                    <button
+                      className="primary-button"
+                      disabled={busy}
+                      onClick={() => {
+                        setMode("run");
+                        run();
+                      }}
+                    >
+                      <Play size={16} />
+                      Test this configuration
+                      <ArrowRight size={16} />
+                    </button>
+                    <button
+                      className="secondary-button"
+                      disabled={exporting || tilt === 10}
+                      onClick={exportCAD}
+                    >
+                      {exporting ? (
+                        <LoaderCircle size={15} className="spin" />
+                      ) : (
+                        <Box size={15} />
+                      )}
+                      Export research geometry
+                    </button>
+                  </div>
+                  <p className="fine-print">
+                    Nominal assembly checked. Not for fabrication: measured fit,
+                    loads and retention are unverified.
+                  </p>
+                  {displayedSearch && (
+                    <SearchResults
+                      result={displayedSearch}
+                      disabled={busy}
+                      applied={
+                        customPolicy === displayedSearch.best.policy &&
+                        tilt === displayedSearch.best.tilt
+                      }
+                      onApply={applyCandidate}
+                      onExport={() =>
+                        save("tacit-policy-search.json", displayedSearch)
+                      }
+                    />
+                  )}
+                </details>
               </>
             )}
             {inspector && (
@@ -1046,7 +1231,13 @@ export default function App() {
             )}
           </aside>
         </div>
-        <section className="timeline" aria-label="Execution timeline">
+        <section
+          className="timeline"
+          aria-label="Execution timeline"
+          style={
+            mode === "design" && !geometryOpen ? { display: "none" } : undefined
+          }
+        >
           <div className="timeline-heading">
             <div>
               <span className="eyebrow">EXECUTION TIMELINE</span>
@@ -1179,11 +1370,11 @@ export default function App() {
               {finished ? (
                 <>
                   <span className="signal-dot" />
-                  {trace?.result.status === "completed"
+                  {!hasViolations && trace?.result.status === "completed"
                     ? missedTarget
                       ? "Target not met in simulation"
                       : "Bulk-removal target reached"
-                    : trace?.result.status === "violated"
+                    : hasViolations || trace?.result.status === "violated"
                       ? "Constraint violation recorded"
                       : "Stopped within the declared model"}
                 </>
@@ -1199,7 +1390,7 @@ export default function App() {
         {mode === "design" && (
           <EvidenceReport
             report={report}
-            disabled={busy}
+            disabled={busy || report?.modelVersion !== MODEL_VERSION}
             onExport={() => save("tacit-experiment.json", report)}
             onApply={(c) => {
               applyCandidate(c);
@@ -1225,7 +1416,7 @@ export default function App() {
               Source
               <Github size={14} />
             </a>
-            <span className="mono">v0.3</span>
+            <span className="mono">v0.4</span>
           </div>
         </footer>
       </main>

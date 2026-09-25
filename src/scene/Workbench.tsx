@@ -316,7 +316,8 @@ export function Workbench(props: Props) {
       if (!raf && !document.hidden)
         raf = requestAnimationFrame(() => {
           raf = 0;
-          renderer.render(scene, camera);
+          if (el.clientWidth > 0 && el.clientHeight > 0)
+            renderer.render(scene, camera);
           const now = performance.now();
           if (latest.current.active && previousFrame) {
             const dt = now - previousFrame;
@@ -414,7 +415,10 @@ export function Workbench(props: Props) {
       request();
     }
     const resize = new ResizeObserver(() => {
-      const { width, height } = el.getBoundingClientRect();
+      if (el.clientWidth === 0 || el.clientHeight === 0) return;
+      // Layout pixels avoid double-scaling the drawing surface under CSS/page zoom.
+      const width = el.clientWidth,
+        height = el.clientHeight;
       renderer.setSize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();

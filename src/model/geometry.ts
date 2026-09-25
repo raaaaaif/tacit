@@ -3,7 +3,7 @@ import D from "./dimensions.json";
 import type { Vec3, Tilt, WorldState, FixtureSpec } from "./types";
 import { clamp, radians, sub, length } from "./math";
 export { D };
-export const MODEL_VERSION = "tacit-0.3.0";
+export const MODEL_VERSION = "tacit-0.4.0";
 export const innerRadius = (z: number) =>
   z < 0
     ? 0

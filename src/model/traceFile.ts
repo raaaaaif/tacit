@@ -74,5 +74,22 @@ export function readTraceFile(value: unknown) {
       });
     }
   }
+  if (trace.manifest) {
+    const ids = new Set(packets.map((p) => p.id));
+    if (ids.size !== packets.length) throw Error("Duplicate camera evidence.");
+    for (const event of trace.events)
+      for (const ref of event.receipt?.evidence ?? [])
+        if (ref.kind === "synthetic-observation") {
+          const packet = packets.find((p) => p.id === ref.id);
+          if (
+            !packet ||
+            Math.abs(packet.t - ref.availableAtS) > 1e-8 ||
+            packet.exposureGroup !== ref.correlationGroup
+          )
+            throw Error(
+              "Receipt camera evidence timing or correlation mismatch.",
+            );
+        }
+  }
   return { trace, packets };
 }

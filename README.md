@@ -1,12 +1,14 @@
 # TACIT
 
-A physical reasoning workbench for laboratory automation. One task—remove wash liquid while preserving an RNA pellet—connects a dimensioned 3D scene, rendered camera evidence, uncertain state estimates, constrained actions and a printable bench-holder concept.
+An execution-readiness workbench for one laboratory handling step: bulk wash removal around a modeled RNA pellet. It connects a dimensioned scene, separate synthetic camera evidence, uncertain state estimates, runtime decision receipts and controlled reruns. Research geometry is computationally checked but not for fabrication.
 
 Built by Raaif Bokhari as an independent project exploring scientific execution data and physical AI. It is a synthetic research workbench, not a biological validation study or a robot deployment.
 
-[Open the workbench](https://tacit-workbench.pages.dev) · [Model and evidence](https://tacit-workbench.pages.dev/docs/methods.html) · [Release review](docs/release-review.md)
+**Local refinement: v0.4.0.** The public links below point to the earlier published version until a separate deployment.
 
-![TACIT physical reasoning workbench](docs/workbench.jpg)
+[Open the published workbench](https://tacit-workbench.pages.dev) · [Model and evidence](https://tacit-workbench.pages.dev/docs/methods.html) · [Release review](docs/release-review.md)
+
+![TACIT execution-readiness workbench](docs/workbench-0.4.png)
 
 ## Run locally
 
@@ -22,8 +24,8 @@ Open the printed localhost address. No login, API key, paid service or GPU compu
 ## Use it
 
 - **Run:** choose a scenario and controller, then run. Space pauses or resumes; R resets the camera.
-- **Investigate:** scrub a run, step one frame at a time, and inspect timestamped camera evidence and decisions. Export JSON/CSV or import a saved trace.
-- **Design:** compare stationary holder inclinations, search policy alternatives, inspect results and export a ZIP containing STL, 3MF and dimension notes.
+- **Investigate:** find the first blocker, inspect original check values and inputs, step through decisions, and export/import a hashed evidence packet with exact camera pixels. Legacy traces remain data-only evidence.
+- **Design:** rerun a matched pair changing history access, view availability or policy. Inspect either arm and export both. Current exploratory results retain all stops and failures; historical results are separate. Research geometry and older search tools are secondary.
 
 The opening scenario is ready to run. The additional scenarios expose changed setup and missing context. A deliberate stop is different from a completed task. The 10° surface-reference configuration is currently unsupported because one reference calculation failed to converge.
 
@@ -33,6 +35,8 @@ The opening scenario is ready to run. The additional scenarios expose changed se
 npm test
 npm run build
 npm run check:budget
+npm run check:calibration
+npm run study:readiness
 ```
 
 Rebuild original meshes with an installed Blender:
@@ -43,7 +47,11 @@ npm run assets
 
 On macOS, the asset runner finds `/Applications/Blender.app`. Elsewhere it uses `blender` on PATH. Set `TACIT_BLENDER` to override the executable. Asset generation uses two CPU threads. The app itself does not need Blender installed.
 
-The GitHub Actions **Held-out controller evaluation** workflow runs the longer experiment in bounded hosted jobs. It uses three optimization seeds per controller, separate training/tuning/evaluation scenes, 512 held-out episodes per primary comparison and a separate 4,096-case geometric stress sample. The generated artifact includes individual episodes and complete-episode outcomes. The published run is [34423472263](https://github.com/raaaaaif/tacit/actions/runs/34423472263). To package its downloaded `held-out-evidence` artifact, run `npx tsx scripts/prepare-evidence.ts <artifact-directory>`; this derives explicit target-attainment counts from recorded final states without rerunning or retuning controllers. Locally, a small diagnostic can use:
+The study command verifies the frozen scientific source hashes before running. Changes to scientific code require a newly versioned study and snapshot; UI-only edits do not invalidate that snapshot.
+
+The current 96-pair exploratory study is in `public/data/readiness-study.json`. It records zero target completions, while readiness increases bulk progress versus fixed + preflight. Its effect estimates and limitations are described in the current methods dossier.
+
+The historical 0.3 GitHub Actions **Held-out controller evaluation** workflow runs the longer experiment in bounded hosted jobs. It uses three optimization seeds per controller, separate training/tuning/evaluation scenes, 512 held-out episodes per primary comparison and a separate 4,096-case geometric stress sample. The generated artifact includes individual episodes and complete-episode outcomes. The published run is [34423472263](https://github.com/raaaaaif/tacit/actions/runs/34423472263). To package its downloaded `held-out-evidence` artifact, run `npx tsx scripts/prepare-evidence.ts <artifact-directory>`; this derives explicit target-attainment counts from recorded final states without rerunning or retuning controllers. Locally, a small diagnostic can use:
 
 ```sh
 npm run experiment -- --n 6 --controller nominal
@@ -68,6 +76,9 @@ The independent Blender image audit can be reproduced with Pillow installed:
 
 ```sh
 python3 scripts/audit-reference.py
+# New frozen nuisance grid, then unchanged feature extractor:
+blender --background --python scripts/blender-reference.py -- --extended
+python3 scripts/audit-readiness-optics.py
 ```
 
 ## Model and evidence

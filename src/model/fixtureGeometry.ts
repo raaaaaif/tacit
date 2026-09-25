@@ -45,6 +45,13 @@ export function fixtureDistance(p: Vec3, s: FixtureSpec) {
     ring = cylinder(6.4, 1.3, 14),
     bore = cylinder(D.tube.outerRadius + s.clearance, 25, 0);
   const seat = Math.max(Math.min(shoulder, ring), -bore);
-  const index = s.indexed ? box([sx, 5.7, sz + 0.2], [2, 4, 2], a) : Infinity;
-  return Math.min(base, ...posts, seat, index);
+  const index = s.indexed
+    ? Math.max(box([sx, 5.7, sz + 0.2], [2, 4, 2], a), -bore)
+    : Infinity;
+  const support = cylinder(
+    D.holder.supportRadius,
+    (D.holder.supportTop - D.holder.supportBottom) / 2,
+    (D.holder.supportTop + D.holder.supportBottom) / 2,
+  );
+  return Math.min(base, support, ...posts, seat, index);
 }

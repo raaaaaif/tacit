@@ -1,6 +1,13 @@
 export type Vec3 = [number, number, number];
 export type ScenarioId = "known" | "shifted" | "missing";
-export type ControllerId = "nominal" | "estimate" | "belief" | "oracle";
+export type ControllerId =
+  | "nominal"
+  | "estimate"
+  | "belief"
+  | "oracle"
+  | "preflight"
+  | "progress"
+  | "stop";
 export type ViewId = "side" | "overhead";
 export type Tilt = 0 | 5 | 10;
 export interface FixtureSpec {
@@ -100,6 +107,7 @@ export type Action =
   | { kind: "observe"; view: ViewId }
   | { kind: "stop"; reason: string };
 export interface TraceEvent {
+  receipt?: import("./evidence").DecisionReceipt;
   index: number;
   t: number;
   duration: number;
@@ -119,6 +127,8 @@ export interface TraceEvent {
   observation?: { view: ViewId; features: Features; packetId: string };
 }
 export interface RunTrace {
+  manifest?: typeof import("./evidence").MANIFEST;
+  intervention?: { history: "available" | "withheld"; views: ViewId[] };
   version: 1;
   modelVersion: string;
   id: string;

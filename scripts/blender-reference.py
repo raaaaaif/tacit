@@ -1,8 +1,9 @@
 """Small independent Cycles render set. Geometry is nominal; no real-camera validation is implied."""
-import bpy,math,json,pathlib
+import bpy,math,json,pathlib,sys
 from mathutils import Vector
 ROOT=pathlib.Path(__file__).resolve().parents[1]
-OUT=ROOT/'public/reference';OUT.mkdir(parents=True,exist_ok=True)
+EXTENDED='--extended' in sys.argv
+OUT=ROOT/('public/reference-readiness' if EXTENDED else 'public/reference');OUT.mkdir(parents=True,exist_ok=True)
 D=json.loads((ROOT/'src/model/dimensions.json').read_text())
 def radius(z):return .55+(4.3-.55)*min(1,z/11)
 def volume(h,tilt):
@@ -23,11 +24,18 @@ def level(v,tilt):
     return (lo+hi)/2
 
 def material(name,color,transmission=0,ior=1.45):
-    m=bpy.data.materials.new(name);m.use_nodes=True;p=m.node_tree.nodes.get('Principled BSDF');p.inputs['Base Color'].default_value=(*color,1);p.inputs['Roughness'].default_value=.1;p.inputs['Transmission Weight'].default_value=transmission;p.inputs['IOR'].default_value=ior
+    m=bpy.data.materials.new(name);m.use_nodes=True;p=m.node_tree.nodes.get('Principled BSDF');p.inputs['Base Color'].default_value=(*color,1);p.inputs['Roughness'].default_value=rough;p.inputs['Transmission Weight'].default_value=transmission;p.inputs['IOR'].default_value=ior
     return m
 cases=[('high-side',850,0,'side',.75),('low-side',350,0,'side',.75),('tilted-side',400,5,'side',.75),('visible-overhead',850,0,'overhead',.75),('missing-overhead',850,0,'overhead',.015)]
+# Freeze the independent nuisance grid before rendering; no extractor tuning.
+if EXTENDED:
+    cases=[(f'grid-side-{i}',v,t,'side',.4,light,rough,bias) for i,(v,t,light,rough,bias) in enumerate([(v,t,.7 if j%2 else 1.3,.05 if j%2 else .2,-.2 if j%2 else .2) for j,(v,t) in enumerate((v,t) for v in [200,350,550,700,850,950] for t in [0,5])])]
+    cases += [(f'grid-overhead-{i}',v,0,'overhead',contrast,1,.1,0) for i,(v,contrast) in enumerate([(350,.015),(350,.75),(850,.015),(850,.75)])]
+else:
+    cases=[(*c,1,.1,0) for c in cases]
+(OUT/'plan.json').write_text(json.dumps({'cases':cases,'frozenBeforeRendering':True,'scope':'Prespecified assumed lighting, roughness and camera-offset grid. No physical calibration; no extractor tuning.'},indent=2))
 manifest=[]
-for name,v,tilt,view,contrast in cases:
+for name,v,tilt,view,contrast,light,rough,bias in cases:
     bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
     bpy.ops.import_scene.gltf(filepath=str(ROOT/'src/assets/tube.glb'))
     angle=math.radians(tilt);rot=Vector((0,angle,0));h=level(v,angle)
@@ -55,13 +63,13 @@ for name,v,tilt,view,contrast in cases:
     nodes=fluid.node_tree.nodes;absorb=nodes.new('ShaderNodeVolumeAbsorption');absorb.inputs['Color'].default_value=(.75,.80,.75,1);absorb.inputs['Density'].default_value=.03;fluid.node_tree.links.new(absorb.outputs['Volume'],nodes.get('Material Output').inputs['Volume'])
     r=radius(3.3)-.325;pellet=(s*3.3,r,c*3.3)
     bpy.ops.mesh.primitive_uv_sphere_add(segments=24,ring_count=16,radius=.65,location=pellet);o=bpy.context.object;o.name='Pellet';o.data.materials.append(material('Pellet contrast',(1-contrast*.6,)*3))
-    bpy.ops.object.camera_add(location=(0,-18,14) if view=='side' else (0,0,40));camera=bpy.context.object;target=Vector((0,0,14) if view=='side' else (0,0,0));camera.rotation_euler=(target-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.type='ORTHO';camera.data.ortho_scale=144*(.21 if view=='side' else .16);camera.data.clip_start=.01;camera.data.clip_end=200
+    bpy.ops.object.camera_add(location=(0,-18,14+bias) if view=='side' else (0,0,40));camera=bpy.context.object;target=Vector((0,0,14+bias) if view=='side' else (0,0,0));camera.rotation_euler=(target-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.type='ORTHO';camera.data.ortho_scale=144*(.21 if view=='side' else .16);camera.data.clip_start=.01;camera.data.clip_end=200
     scene=bpy.context.scene;scene.camera=camera
     scene.world.color=(.8,.8,.8);scene.world.use_nodes=True;scene.world.node_tree.nodes['Background'].inputs[0].default_value=(.78,.78,.78,1);scene.world.node_tree.nodes['Background'].inputs[1].default_value=1
     for loc,power,size in [((-15,-12,30),1500,25),((12,8,35),2000,22)]:
-        bpy.ops.object.light_add(type='AREA',location=loc);lamp=bpy.context.object;lamp.data.energy=power;lamp.data.shape='DISK';lamp.data.size=size;lamp.rotation_euler=(Vector((0,0,15))-lamp.location).to_track_quat('-Z','Y').to_euler()
+        bpy.ops.object.light_add(type='AREA',location=loc);lamp=bpy.context.object;lamp.data.energy=power*light;lamp.data.shape='DISK';lamp.data.size=size;lamp.rotation_euler=(Vector((0,0,15))-lamp.location).to_track_quat('-Z','Y').to_euler()
     scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=32;scene.cycles.use_denoising=False;scene.cycles.max_bounces=16;scene.cycles.transmission_bounces=12;scene.render.threads_mode='FIXED';scene.render.threads=2
     scene.render.resolution_x=112;scene.render.resolution_y=144;scene.render.resolution_percentage=100;scene.view_settings.view_transform='Standard';scene.render.image_settings.file_format='PNG';scene.render.filepath=str(OUT/(name+'.png'))
     bpy.ops.render.render(write_still=True)
-    manifest.append({'id':name,'volume':v,'tilt':tilt,'view':view,'contrast':contrast,'referenceHeight':h,'file':name+'.png','width':112,'height':144})
+    manifest.append({'id':name,'volume':v,'tilt':tilt,'view':view,'contrast':contrast,'lightScale':light,'roughness':rough,'cameraOffsetMm':bias,'referenceHeight':h,'file':name+'.png','width':112,'height':144})
 (OUT/'manifest.json').write_text(json.dumps({'version':1,'renderer':'Blender '+bpy.app.version_string+' / Cycles CPU / 32 samples','cases':manifest,'scope':'Independent synthetic renderer consistency check. Not real-camera accuracy. Optical properties and lighting are assumed.'},indent=2))

@@ -1,6 +1,6 @@
 {
   "name": "tacit-workbench",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,8 @@
     "test": "tsx --test tests/*.test.ts",
     "experiment": "tsx scripts/experiment.ts",
     "assets": "tsx scripts/fixture-meshes.ts && node scripts/run-blender.mjs",
+    "study:readiness": "tsx scripts/verify-study-source.ts && tsx scripts/readiness-study.ts",
+    "check:calibration": "tsx scripts/readiness-calibration.ts",
     "check:budget": "node scripts/budget.mjs"
   },
   "dependencies": {

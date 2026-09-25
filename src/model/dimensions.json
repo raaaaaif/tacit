@@ -1,5 +1,5 @@
 {
-  "revision": "nominal-tube-01",
+  "revision": "nominal-assembly-02",
   "units": "mm",
   "provenance": "Nominal research geometry, not a metrology-certified manufacturer replica. 1 mm\u00b3 = 1 \u00b5L.",
   "tube": {
@@ -55,7 +55,11 @@
     "baseHeight": 3,
     "seatHeight": 15,
     "seatClearance": 0.35,
-    "windowWidth": 13
+    "windowWidth": 13,
+    "supportRadius": 2.4,
+    "supportBottom": -1.8,
+    "supportTop": -0.65,
+    "radialTolerance": 0.05
   },
   "operating": {
     "flowRate": 18,

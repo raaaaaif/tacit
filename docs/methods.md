@@ -1,8 +1,69 @@
-# TACIT: model and evidence dossier
+# TACIT 0.4: execution readiness and evidence
 
-TACIT makes the unspoken judgments in a laboratory handling step inspectable: locate the tube and liquid, preserve uncertainty about a pellet, check a complete instrument path, remove a bounded amount, and stop when the evidence no longer supports an action. It is an independent project by Raaif Bokhari, inspired by RNA isolation at the bench and by the practical constraints of designing objects for 3D fabrication.
+TACIT asks a narrow question: what available evidence supports the next move or withdrawal during bulk wash removal in one nominal tube? It connects a timed physical scene, synthetic camera observations, uncertain state estimates, runtime decision records, and controlled reruns. The primary outcome is inspectable execution evidence. It does not establish physical safety, biological success, or a fabrication-ready holder.
 
-The relevant connection to Transfyr is **scientific execution data**: a procedural instruction becomes timed actions, observations, uncertainty and outcomes. A trace can be replayed or inspected independently of its presentation. This is a small research workbench, not a trained robot model or a deployed laboratory controller.
+## Current release and scope
+
+This dossier describes `tacit-0.4.0`, geometry `nominal-assembly-02`, and readiness policy revision 2. Run, Investigate and Design now form a single workflow: compute an episode, inspect a recorded decision, change one information or policy condition, then export both arms. Original 0.3 evidence remains separately labelled and is never relabelled as a current-model benchmark. The original methods are preserved in `docs/methods-0.3.md`.
+
+The supported screening domain remains 0° or 5° inclination and 100–950 µL. The 150 µL residual objective includes a 12 µL estimate tolerance. The 10° Surface Evolver non-convergence is retained and excludes that configuration. All dimensions and stochastic distributions are research assumptions unless specifically sourced below.
+
+## Nominal assembly contract
+
+The previous visual index intersected the nominal tube and the seated bottom had a 0.45 mm gap. The fence now has the same bore subtraction as the holder. A connected, tilted support pad meets the exterior tube bottom at its declared datum. Seating offsets lie in the transverse plane, preserving that support plane; the fixture never moves with tube uncertainty. The index is a visual history marker, not a mechanical orientation key.
+
+CAD, analytic collision geometry, optical masks and regenerated display assets use the shared dimension source. Regressions check tube body, lip, hinge and open cap over supported inclinations and tolerance offsets; an independent Manifold intersection checks the full outer tube along sampled insertion positions. The sampled insertion test is not a continuous swept proof. Export is restricted to the computationally checked inclinations. STL and 3MF contain identical coordinates in mm. Fit, retention, loading, manufacturability and chemical compatibility remain unmeasured. Every export says NOT FOR FABRICATION.
+
+## Decisions are recorded before actions
+
+A policy receives an explicit copied input: belief particles, existing evidence references, commanded amount, instrument position, fixture and procedure assumptions, and available views. It does not receive the environment world state. The oracle comparator has an explicit privileged capability and is labelled separately. Environment truth is used to generate observations and evaluate outcomes only.
+
+Each action is selected from those inputs and a receipt is committed at the same simulation timestamp before the environment executes it. The receipt preserves its manifest, belief snapshot, candidate targets, actual check values and thresholds, evidence availability and correlation groups, view predictions, bounded-search termination, and reason code. Later observations cannot appear in an earlier receipt. Camera references are checked against the saved capture timestamp and exact image packet. The display does not synthesize explanations for old traces.
+
+Checked move and aspiration actions require nominal assembly, supported domain, swept hardware and pellet clearance, stage limits, tip capacity, useful volume, and immersion at the end of the complete commanded stroke. The checked uncertainty envelope uses marginal 95% volume/pose intervals, retained particle orientations (a full ring when unresolved), a three-sigma pump allowance and 1.85 mm surface allowance. These are assumed envelopes, not a joint 95% guarantee. Gaussian tails and model discrepancy remain outside that envelope.
+
+Holder position is stationary within each physical hypothesis. Because the particle state estimates tube position without independently resolving the seating offset, checked hardware clearance subtracts an additional 0.8 × radial-clearance bound for unknown seating, plus the tilt-dependent vertical allowance. Hypothetical optical predictions use a centered seat and remain planning approximations.
+
+The fixed and point-estimate comparators retain unchecked actions and expose that fact in their receipts. The preflight baseline checks one fixed procedure target before committing. The readiness controller checks at most four physical candidates, chooses feasible progress, and evaluates side/overhead observation options from three deterministic hypothetical posterior-predictive states. A 2 µL-equivalent observation cost and six-observation budget bound this search. It never uses the realized future observation to decide whether to acquire it. “No tested action passed” means this bounded candidate set failed; it does not prove no feasible action exists.
+
+Missing history does not automatically prevent distant bulk progress. Unresolved orientation is retained around the full exclusion ring and may block subsequent close approach. Repeated correlated camera evidence cannot manufacture an orientation record.
+
+## Controlled interventions and exploratory study
+
+Every pair is rerun from initialization with exact matching initial physical state. Context changes access to an existing history record; observation changes side-only versus both views being available; policy changes fixed + preflight versus readiness. Extra view availability does not imply that the controller must use it. Scene and sensor streams are keyed; actuation draws are indexed by commanded stroke, so different action schedules do not claim physically identical realizations.
+
+The final evaluation plan, assignment list and 27 scientific source/lockfile hashes were frozen before execution. An earlier study and a partial source-review restart are retained as superseded, not used for current claims. Development examples use seed 1847; evaluation uses 12 separately assigned scenes per family. History has 24 pairs (known and changed); view and policy each have 36 pairs (also missing context). All 96 assigned pairs completed computation, with no administrative failures. This is a small exploratory simulation study, not a preregistered confirmatory or physical validation study. The final rerun reuses the scene seeds from the superseded preliminary study after a code-audit-driven uncertainty repair. It is therefore a regression evaluation, not an untouched test set. Scientific source hashes were verified again after the run. UI and documentation edits continued independently. The local freeze is reproducible, but is not an independently timestamped preregistration.
+
+- Context: withholding history increased mean residual by 64.63 µL; paired 95% bootstrap interval 11.08–112.44 µL.
+- Observation: making the overhead view available changed residual by −57.07 µL; interval −108.81 to −11.02 µL. This is conditional on the assumed synthetic scene population.
+- Policy: readiness changed residual by −262.17 µL versus fixed + preflight; interval −315.76 to −211.46 µL, with 15.76 s more mean elapsed time.
+- Every arm recorded zero target completions and zero modeled violations. All 192 episodes stopped. All stops stay in the means. Readiness made progress in all 36 policy scenes; preflight made progress in 24 of 36.
+
+Paired bootstrap resamples matched scenes within family. Zero-width completion intervals are labelled degenerate, not presented as proof of equal population performance. A zero-event one-sided 95% binomial upper bound is 11.73% for 24 independent trials and 7.98% for 36; model error is additional. Completion, conservative stop, modeled violation and missed declared target partition episodes. Aspiration exposure and stop-before/after-progress are separate facts. The stop-immediately controller is a diagnostic sentinel and never evidence of task success.
+
+## Calibration and retained negative evidence
+
+The new internal report contains 36 side-view checks: the nominal 95% volume intervals covered all 36 synthetic truths, with zero missed liquid-level features. Nine sensitivity episodes vary assumed pump error and camera calibration bias. This checks internal consistency under the same generator, not camera calibration or robust physical coverage. A new 16-image Cycles grid was specified before rendering: six fill volumes, 0°/5° tilt, light scales 0.7/1.3, roughness 0.05/0.2, camera vertical offsets ±0.2 mm, and four overhead contrast/fill cases. No extractor tuning followed. All 12 side levels were detected, but only 6/12 nominal feature-level 95% intervals covered the reference; maximum absolute level error was 1.6393 mm. All four overhead pellet detections failed. Missing detections count as noncoverage. These assumed nuisance ranges are an independent-renderer stress diagnostic, not empirically justified physical coverage. The raw images, frozen plan and results are saved under `public/reference-readiness` and `public/data/readiness-optics.json`.
+
+The separate original independent Blender audit is retained: high-fill level bias reaches 1.39 mm and both overhead pellet detections fail. We did not replace these failures with the new internally generated measurements.
+
+Independent SciPy quadrature/root solving over 96 cases found maximum height error 0.000521 mm and volume error 0.02991 µL. These agreement checks do not validate near-tip fluid dynamics or physical pellet retention. The original hosted 0.3 evaluation and stress sample remain historical and separate from current results.
+
+## Portable evidence and compatibility
+
+A case packet includes a trace, exact camera pixels, original receipts, readable limitations and, when applicable, both rerun arms. Canonical SHA-256 hashes detect modification of the payload. This is local integrity, not an external authenticity signature. Imports use bounded schemas, reject nonfinite values, future evidence, unknown receipt fields, inconsistent manifests and mismatched pair states, and commit to the UI only after complete validation. Rejected files leave the previous case intact.
+
+Legacy 0.2/0.3 files retain their events and pixels without invented receipts. They are displayed as historical evidence without rendering their physical trace against the repaired current holder. Recorded files are not recomputed on import. Re-export changes the transport provenance kind from live to recorded and computes a new payload hash; original events, input sources, manifests, outcomes and camera pixels remain unchanged. Byte-identical re-export of the outer packet is not claimed. Replaying or selecting an arm never grants later evidence to the policy.
+
+## Reproduction and engineering limits
+
+Use Node 24, `npm ci`, `npm test`, `npm run build`, and `npm run check:budget`. `npm run study:readiness` reproduces the exploratory assignments and summary; `npm run check:calibration` produces the internal checks. `npm run assets` requires Blender. Numerical and independent optical audit commands are in README. Detailed browser, animation, export and failure-path review is in `docs/release-review.md`.
+
+The system is deterministic given its manifest, seed and declared interventions. It is a quasistatic screening model without pellet adhesion, local flow, biological yield, measured material tolerances, camera housing collisions or contact mechanics. A recorded pass establishes only that the implemented checks passed under their declared assumptions.
+
+## Inherited physical model and sources
+
+The following physical formulation and sources carry forward from the prior model. Controller behavior and current evaluation are defined above; older controller and benchmark descriptions are archived separately.
 
 ## Units, geometry and motion
 
@@ -12,7 +73,7 @@ The interior is a truncated cone (base radius 0.55 mm, top radius 4.3 mm, height
 
 The maximum stage speed is 18 mm/s and acceleration is 70 mm/s². Move duration and playback use the same triangular or trapezoidal velocity profile. The entire tip/shaft envelope is sampled axially every 0.4 mm with a 0.21 mm allowance, followed by conservative advancement along the translation. Tube wall, mouth, open cap, hinge and constructive fixture geometry are checked. A separate swept instrument-to-pellet check protects the declared 1.8 mm exclusion margin. The margin is a research constraint; it is not a model of pellet adhesion or disruption.
 
-The fixture base stays on the bench at every inclination. Fixture placement and tube seating are separate. Seating offsets are bounded to 80% of nominal radial clearance so the nominal tube starts inside the bore. A known orientation record is retained only when orientation indexing is enabled. Adding an index after history is lost cannot recover that history.
+The fixture base stays on the bench at every inclination. Fixture placement and tube seating are separate. Seating offsets are bounded to 80% of nominal radial clearance so the nominal tube starts inside the bore. The visual orientation marker supports a supplied history record but does not mechanically key the tube. Adding an index after history is lost cannot recover that history.
 
 ## Quasistatic liquid and equilibrium reference
 
@@ -32,29 +93,8 @@ The presentation scene never supplies measurements to the observed controller. A
 
 Image features estimate a side-view liquid boundary, tube position and, when separable, a pellet direction. A liquid boundary needs horizontal gradient support across the tube interior; an obscured surface cannot be replaced by a small dark pellet feature. A particle filter tracks liquid volume, pose and pellet orientation. It carries a persistent liquid-level calibration nuisance variable so repeated observations do not treat a fixed bias as independent noise. Repeated capture groups cannot update the belief twice; the group identifier derives from the known action epoch, not a hidden liquid volume. Repeated side images do not repeatedly sharpen the same pose measurement.
 
-The side camera cannot resolve the perpendicular seating coordinate. When that uncertainty affects access, an overhead observation constrains it. If pellet contrast and orientation history are both insufficient, the policy stops. The visible pellet highlight belongs to the explanatory view and is never a measurement.
+The side camera cannot resolve the perpendicular seating coordinate. When that uncertainty affects access, an overhead observation constrains it. If pellet contrast and orientation history are both insufficient, orientation remains unresolved and limits feasible actions. The visible pellet highlight belongs to the explanatory view and is never a measurement.
 
-## Controllers and evaluation
-
-Four controllers share the environment and scoring: a fixed nominal procedure, a single image-derived point estimate, a belief-aware controller, and a hidden-state reference. The reference receives truth explicitly; it is a comparison for sensing limitations, not a learned policy or a guarantee of optimality.
-
-Differential evolution searches withdrawal size, clearance margin, immersion depth, observation interval and supported stationary inclination. The ranking is feasibility first, then residual volume plus 0.3 seconds-equivalent per unit duration. The interface plots the separate residual/time/violation quantities and identifies its interactive search as training only. Saved hosted searches load immediately; a fresh 32-candidate browser search is optional and cancellable. The optimization does not fit biological success or survival probabilities.
-
-The hosted evaluation gives every controller three optimization seeds and the same candidate/episode budget. Candidate parameters are trained on disjoint scene seeds, selected using tuning scenes, and evaluated on 512 held-out paired scenes per primary comparison. Named random streams separate fixture placement, seating, orientation, starting volume, sensing and actuation. A separate 4,096-case geometric stress sample does not count as rendered episodes.
-
-Whole-episode violations use Wilson 95% intervals. Mean residual and duration use 1,000 bootstrap replicates. A controller declaration of completion is recorded separately from actual target attainment. The evaluator requires the declared completion, no recorded constraint violation, and simulated residual at or below the policy target plus 12 µL. A false completion declaration is reported as an unmet target, not as a success or a conservative stop. This assessment uses final hidden state only after execution; it never feeds a decision. Stops remain separate from completed tasks and remain in all averages. Zero observed violations would not imply zero risk. Results generated for an earlier model revision are not displayed as current evidence.
-
-## Assets, replay and exports
-
-The original labware and stage assets are authored by the Blender script in `scripts/assets.py`. The holder's presentation mesh and CAD exports share the constructive solid in `src/cad/solid.ts`; presentation bevels, fasteners and the colored index mark are cosmetic details. The printable solid is a nominal untested bench holder. It is not a centrifuge rotor component. Its cylindrical seating/retention concept, material choice, fit and chemical compatibility require physical testing before use. The opening between support columns is 13 mm. Cosmetic fluid geometry uses a 0.0125 mm radial inset to avoid coplanar display artifacts; the numerical volume calculation uses the full cavity.
-
-Trace JSON includes camera pixel buffers, capture timestamps, policy parameters, scene configuration, model version, random seed, actions and outcomes. Import preserves those recorded observations rather than rerendering them with a newer model. CSV is a tabular event export. The CAD ZIP contains STL, 3MF and dimension notes. Both mesh exports contain identical geometry in millimetres.
-
-Playback is checked at 60 samples per simulated second for continuity, speed limits and volume conservation. Aspiration animates during the pump stroke; the liquid remains stationary during settling. Camera evidence appears only after acquisition completes. These checks establish implementation consistency, not experimental physical accuracy.
-
-## What requires a bench experiment
-
-A useful next experiment would measure tube and tip dimensions, camera calibration and refraction, a seating-error distribution, liquid contact angles, pump-volume error and repeatable settling time. Only then would it be appropriate to study pellet disturbance, residual wash, yield or RNA integrity. A blinded set of real images and independently recorded motion would be needed before making real-camera or real-robot accuracy claims.
 
 ## Sources
 
@@ -64,30 +104,3 @@ A useful next experiment would measure tube and tip dimensions, camera calibrati
 - Ken Brakke, [Surface Evolver energies](https://kenbrakke.com/evolver/html/energies.htm), [constraints](https://kenbrakke.com/evolver/html/constrnt.htm) and [stability tutorial](https://kenbrakke.com/evolver/html/eigentut.htm): energy minimization and convergence checks.
 - Pharr, Jakob and Humphreys, [Specular reflection and transmission](https://www.pbr-book.org/4ed/Reflection_Models/Specular_Reflection_and_Transmission): geometric optics and refraction.
 - [Current equilibrium-reference run](https://github.com/raaaaaif/tacit/actions/runs/34421128895), including the retained nonconvergent case.
-
-## Independent renderer consistency audit
-
-Five additional images were rendered in Blender Cycles on CPU at 32 samples. Three side views cover 350, 400 and 850 µL, including a 5° case; two overhead images vary pellet contrast. The same pixel feature extractor was applied without retraining. Side-view level errors ranged from approximately 0.32 to 1.39 mm. The conservative pellet detector did not return a direction in either overhead reference image, including the visibly higher-contrast case. Both misses are retained.
-
-This demonstrates a material limit: the primary renderer's feature error distribution does not establish accuracy in another renderer, much less a physical camera. The workbench's held-out results apply to its declared synthetic observation model. The reference images and raw feature output are available under `public/reference/`; they should be part of a discussion of calibration, domain shift and abstention.
-
-## Published held-out results
-
-The hosted run at source commit `043dcc6719f5e3586cccf03b2ff601160db74c20` completed all four controller jobs and aggregation. Each row below covers the same 512 paired scenes: 171 known setups, 171 changed setups and 170 missing-context cases. The separate geometric stress sample rejected 3,202 of 4,096 proposed paths; this is an access-screening result, not a failure probability.
-
-| Controller | Baseline mean residual | Baseline completed / stopped / violated / missed | Tuned mean residual | Tuned completed / stopped / violated / missed |
-|---|---:|---:|---:|---:|
-| Fixed procedure | 182.6 µL | 365 / 0 / 38 / 109 | 182.2 µL | 363 / 0 / 39 / 110 |
-| Point estimate | 155.0 µL | 474 / 0 / 31 / 7 | 152.6 µL | 489 / 0 / 21 / 2 |
-| Belief-aware | 459.9 µL | 40 / 463 / 2 / 7 | 448.8 µL | 117 / 390 / 1 / 4 |
-| Hidden-state reference | 150.8 µL | 512 / 0 / 0 / 0 | 151.1 µL | 494 / 18 / 0 / 0 |
-
-All outcomes, including stops, remain in the means. The belief-aware policy stopped in every missing-context case before aspiration. Within the known-setup family, tuning changed its mean residual from 183.9 to 161.4 µL and its completed count from 31 to 81 out of 171. This is a useful synthetic improvement, but many cases still stop. Its overall violation counts of 2/512 and 1/512 have overlapping Wilson 95% intervals (0.107–1.413% and 0.034–1.098%); the experiment does not establish that tuning reduces violation risk. Tuning did not improve every controller: the fixed procedure recorded one additional violation and the hidden-state reference recorded 18 stops. These negative results are retained.
-
-The published assessment version is `target-attainment-1`. It was derived from the saved final-state episode records after the controller evaluation, without changing trajectories, measurements, search rankings or selected parameters. CSV residuals are stored to four decimal places; no published episode lies within 0.025 µL of the 162 µL completion boundary. Raw controller declarations remain in the CSV. The experiment JSON contains corrected completion counts, missed targets and confidence intervals, and the browser recomputes the same assessment for an individual trace.
-
-- [Hosted evaluation run](https://github.com/raaaaaif/tacit/actions/runs/34423472263)
-- [Machine-readable report](https://tacit-workbench.pages.dev/data/experiment.json)
-- [All episode records](https://tacit-workbench.pages.dev/data/episodes.csv)
-
-The fixture search currently varies stationary inclination and policy parameters. The 13 mm opening, 0.35 mm nominal clearance and support solid are fixed; indexing is a manual configuration. Free-form fixture optimization and broad pump/settling/calibration sensitivity campaigns are not part of this published evaluation. Physical camera housings, real wetting calibration, pellet mechanics and bench fit remain outside its validated scope.
