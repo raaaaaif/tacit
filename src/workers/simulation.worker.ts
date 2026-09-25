@@ -4,31 +4,35 @@ import type {
   ScenarioSpec,
   PolicySpec,
   ObservationPacket,
+  RunTrace,
 } from "../model/types";
 import { optimize } from "../model/optimization";
-self.onmessage = (
-  event: MessageEvent<{
-    type: "run" | "optimize" | "compare";
-    jobId: number;
-    intervention?: Intervention;
-    scenario: ScenarioSpec;
-    policy: PolicySpec;
-  }>,
-) => {
+type Request = {
+  jobId: number;
+  scenario: ScenarioSpec;
+} & (
+  | { type: "compare"; intervention: Intervention }
+  | {
+      type: "run" | "optimize";
+      policy: PolicySpec;
+      access?: RunTrace["intervention"];
+    }
+);
+self.onmessage = (event: MessageEvent<Request>) => {
   try {
-    const { scenario, policy, type, jobId } = event.data;
+    const request = event.data;
+    const { scenario, jobId } = request;
     const post = (value: object) => self.postMessage({ ...value, jobId });
-    if (type === "compare") {
-      const result = runComparison(
-        scenario,
-        event.data.intervention!,
-        (progress) => post({ type: "progress", progress }),
+    if (request.type === "compare") {
+      const result = runComparison(scenario, request.intervention, (progress) =>
+        post({ type: "progress", progress }),
       );
       post({ type: "comparison-done", result });
       return;
     }
+    const { policy } = request;
     const packets: ObservationPacket[] = [];
-    if (type === "optimize") {
+    if (request.type === "optimize") {
       const result = optimize(scenario, policy, 739, {
         onEvaluation: (completed, total) =>
           post({ type: "search-evaluation", completed, total }),
@@ -39,6 +43,7 @@ self.onmessage = (
       return;
     }
     const trace = runSimulation(scenario, policy, {
+      ...request.access,
       onProgress: (progress) => post({ type: "progress", progress }),
       onObservation: (packet) => packets.push(packet),
     });

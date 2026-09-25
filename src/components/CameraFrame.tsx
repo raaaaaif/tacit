@@ -4,10 +4,14 @@ export function CameraFrame({
   packet,
   label,
   active = false,
+  now,
+  enabled = true,
 }: {
   packet?: ObservationPacket;
   label: string;
   active?: boolean;
+  now?: number;
+  enabled?: boolean;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -33,7 +37,9 @@ export function CameraFrame({
     );
   }, [packet]);
   return (
-    <div className={`camera-frame ${active ? "camera-active" : ""}`}>
+    <div
+      className={`camera-frame ${active ? "camera-active" : ""} ${packet ? "" : "no-capture"}`}
+    >
       <div className="camera-title">
         <span className="signal-dot" />
         {label}
@@ -48,8 +54,10 @@ export function CameraFrame({
       </div>
       <div className="camera-caption">
         {packet
-          ? `${packet.calibration.width} × ${packet.calibration.height} · simulated optics`
-          : "No observation at this time"}
+          ? `${packet.calibration.width} × ${packet.calibration.height} · captured ${packet.t.toFixed(2)} s${now !== undefined ? ` · age ${Math.max(0, now - packet.t).toFixed(2)} s` : ""} · simulated optics`
+          : enabled
+            ? "Available · not captured yet"
+            : "Not enabled in this run"}
       </div>
     </div>
   );

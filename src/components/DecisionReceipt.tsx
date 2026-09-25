@@ -28,8 +28,25 @@ export function DecisionReceipt({
   onExport: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [inspected, setInspected] = useState({ receipt: "", candidate: "" });
   const r = event?.receipt,
-    index = event?.index ?? 0;
+    index = Math.max(
+      0,
+      trace.events.findIndex((e) => e === event),
+    );
+  const alternatives =
+    event?.action.kind === "stop" ? (r?.candidates ?? []) : [];
+  const candidate =
+    alternatives.find(
+      (c) => inspected.receipt === r?.id && c.id === inspected.candidate,
+    ) ?? alternatives[0];
+  // A stop receipt retains a union of checks from its search. Never present
+  // that union as if a single physical action passed those checks.
+  const checks = candidate?.checks ?? r?.checks ?? [];
+  const passingCandidates = alternatives.filter(
+    (c) =>
+      c.checks.length > 0 && c.checks.every((check) => check.status === "pass"),
+  ).length;
   const blocker =
     trace.events.find(
       (e) => e.receipt?.blockers.length || e.violations.length,
@@ -78,7 +95,8 @@ export function DecisionReceipt({
                       EVALUATED_VIOLATION: "Modeled violation recorded.",
                       EVIDENCE_UNRESOLVED: "Evidence remains unresolved.",
                     } as Record<string, string>
-                  )[r.reasonCode] ?? "No tested action passed.")
+                  )[r.reasonCode] ??
+                  `Stopped at ${event.volume.toFixed(1)} µL.`)
                 : event?.action.kind === "observe"
                   ? "Acquire decision evidence."
                   : event?.action.kind === "move"
@@ -107,10 +125,100 @@ export function DecisionReceipt({
       </div>
       {r && (
         <>
+          {alternatives.length > 0 && (
+            <div className="candidate-overview">
+              <p>
+                <strong>
+                  {passingCandidates === 0
+                    ? `None of ${alternatives.length} tested withdrawals passed every check.`
+                    : `${passingCandidates} of ${alternatives.length} alternatives passed every recorded check.`}
+                </strong>
+                <br />
+                Pellet exclusion blocked{" "}
+                {
+                  alternatives.filter((c) =>
+                    c.checks.some(
+                      (k) => k.id === "swept-pellet" && k.status === "fail",
+                    ),
+                  ).length
+                }
+                /{alternatives.length}; hardware clearance blocked{" "}
+                {
+                  alternatives.filter((c) =>
+                    c.checks.some(
+                      (k) => k.id === "swept-hardware" && k.status === "fail",
+                    ),
+                  ).length
+                }
+                /{alternatives.length}.
+              </p>
+              <table className="candidate-matrix">
+                <caption>Modeled clearance · mm</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Alternative</th>
+                    <th scope="col">Withdrawal</th>
+                    <th scope="col">Hardware</th>
+                    <th scope="col">Pellet</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alternatives.map((c, i) => (
+                    <tr key={c.id}>
+                      <th scope="row">{i + 1}</th>
+                      <td>{c.requestedVolumeUl.toFixed(1)} µL</td>
+                      {["swept-hardware", "swept-pellet"].map((id) => {
+                        const check = c.checks.find((k) => k.id === id);
+                        return (
+                          <td key={id} data-status={check?.status}>
+                            {check?.value?.toFixed(3) ?? "Unknown"}
+                            <br />
+                            {check?.status === "pass"
+                              ? "Pass"
+                              : check?.status === "fail"
+                                ? "Blocked"
+                                : "Unknown"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {candidate && (
+            <div className="candidate-selector">
+              <label htmlFor="receipt-candidate">
+                Inspect a searched alternative
+              </label>
+              <select
+                id="receipt-candidate"
+                value={candidate.id}
+                onChange={(e) =>
+                  setInspected({ receipt: r.id, candidate: e.target.value })
+                }
+              >
+                {alternatives.map((c, i) => (
+                  <option key={c.id} value={c.id}>
+                    Alternative {i + 1} · {c.requestedVolumeUl.toFixed(1)} µL ·{" "}
+                    {c.checks.filter((k) => k.status !== "pass").length}{" "}
+                    unresolved checks
+                  </option>
+                ))}
+              </select>
+              <p>
+                {passingCandidates} of {alternatives.length} alternatives passed
+                every recorded check. Values below belong to alternative{" "}
+                {alternatives.indexOf(candidate) + 1}; no action was selected at
+                this stop.
+              </p>
+            </div>
+          )}
           <div className="receipt-checks">
             {(expanded
-              ? r.checks
-              : r.checks.filter(
+              ? checks
+              : checks.filter(
                   (c) =>
                     c.status !== "pass" ||
                     ["swept-pellet", "immersion-through-stroke"].includes(c.id),
@@ -124,8 +232,30 @@ export function DecisionReceipt({
                       ? "Not resolved"
                       : c.unit === "boolean"
                         ? "Declared model check"
-                        : `${c.value.toFixed(2)} ${c.unit} · requires ${c.relation} ${c.threshold?.toFixed(2) ?? "—"}`}
+                        : `${c.value.toFixed(3)} ${c.unit} · requires ${c.relation} ${c.threshold?.toFixed(3) ?? "—"}`}
                   </small>
+                  {c.value !== null &&
+                    c.threshold !== null &&
+                    c.unit !== "boolean" &&
+                    ["≥", "≤", ">=", "<="].includes(c.relation) &&
+                    c.threshold > 0 &&
+                    (() => {
+                      const lo = Math.min(0, c.value),
+                        hi = Math.max(c.threshold * 1.3, c.value * 1.1);
+                      const position = (v: number) =>
+                        `${(100 * (v - lo)) / (hi - lo)}%`;
+                      return (
+                        <>
+                          <div className="check-margin" aria-hidden="true">
+                            <b style={{ left: position(c.threshold) }} />
+                            <i style={{ left: position(c.value) }} />
+                          </div>
+                          <small className="check-margin-legend">
+                            ● evaluated value · │ required bound
+                          </small>
+                        </>
+                      );
+                    })()}
                 </span>
                 <b>
                   {c.status === "pass"
@@ -138,22 +268,28 @@ export function DecisionReceipt({
             ))}
           </div>
           <p className="check-count">
-            {r.checks.filter((c) => c.status === "pass").length} of{" "}
-            {r.checks.length} recorded checks pass · under model assumptions
+            {candidate
+              ? `Alternative ${alternatives.indexOf(candidate) + 1}: ${checks.filter((c) => c.status === "pass").length} / ${checks.length} checks pass under model assumptions.`
+              : event?.action.kind === "stop"
+                ? "A recorded stop is not an authorization to act."
+                : `${checks.filter((c) => c.status === "pass").length} / ${checks.length} checks recorded as passing for this action, under model assumptions.`}
           </p>
           <button
             className="receipt-expand"
             aria-expanded={expanded}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? "Hide" : "Inspect"} recorded inputs & alternatives{" "}
+            {expanded ? "Hide" : "Show"} observations and tested alternatives{" "}
             <ChevronRight size={14} />
           </button>
           {expanded && (
             <div className="receipt-detail">
               <p>
-                <b>At {r.decisionAtS.toFixed(2)} s</b> · {r.evidence.length}{" "}
-                available sources · {r.search.count} tested candidates
+                <b>
+                  {r.reasonCode} · At {r.decisionAtS.toFixed(2)} s
+                </b>{" "}
+                · {r.evidence.length} available sources · {r.search.count}{" "}
+                tested candidates
               </p>
               <p>{r.uncertainty}</p>
               <h3>Evidence available at this decision</h3>

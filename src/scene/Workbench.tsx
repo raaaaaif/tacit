@@ -27,7 +27,7 @@ interface Props {
   tip: Vec3;
   aspirated: number;
   cutaway: boolean;
-  showBelief: boolean;
+  showExclusion: boolean;
   reset: number;
   active: boolean;
 }
@@ -134,8 +134,8 @@ export function Workbench(props: Props) {
     const pmrem = new THREE.PMREMGenerator(renderer),
       environment = pmrem.fromScene(new RoomEnvironment(), 0.04);
     scene.environment = environment.texture;
-    scene.add(new THREE.HemisphereLight(0xf7f7ed, 0x67796d, 0.8));
-    const light = new THREE.DirectionalLight(0xfff7e5, 2.5);
+    scene.add(new THREE.HemisphereLight(0xf5f7fa, 0x677078, 0.8));
+    const light = new THREE.DirectionalLight(0xffffff, 2.5);
     light.position.set(-30, 75, 50);
     light.castShadow = true;
     light.shadow.mapSize.set(1024, 1024);
@@ -170,7 +170,7 @@ export function Workbench(props: Props) {
     const fluid = new THREE.Mesh(
       fluidMesh(20, 0),
       new THREE.MeshPhysicalMaterial({
-        color: 0x8aab99,
+        color: 0x4b91a0,
         roughness: 0.16,
         metalness: 0.02,
         transparent: true,
@@ -183,7 +183,7 @@ export function Workbench(props: Props) {
     const meniscus = new THREE.Mesh(
       new THREE.CircleGeometry(4.3, 80),
       new THREE.MeshPhysicalMaterial({
-        color: 0x96b09e,
+        color: 0x72b3bd,
         roughness: 0.12,
         metalness: 0.08,
         transparent: true,
@@ -249,7 +249,7 @@ export function Workbench(props: Props) {
     const tipLiquid = new THREE.Mesh(
       new THREE.BufferGeometry(),
       new THREE.MeshPhysicalMaterial({
-        color: 0x7f9985,
+        color: 0x418697,
         roughness: 0.15,
         transparent: true,
         opacity: 0.85,
@@ -273,11 +273,19 @@ export function Workbench(props: Props) {
             for (const mat of mats) {
               if (mat instanceof THREE.MeshStandardMaterial) {
                 mat.envMapIntensity = 0.55;
+                // Presentation contrast only; recorded camera pixels are unchanged.
+                if (
+                  name.startsWith("holder-") &&
+                  mat.name === "Ceramic graphite"
+                ) {
+                  mat.color.set(0x647079);
+                  mat.roughness = 0.72;
+                }
                 if (mat.name.startsWith("Polypropylene")) {
                   const p = mat as THREE.MeshPhysicalMaterial;
                   p.transmission = 0.18;
                   p.roughness = 0.3;
-                  p.color.set(0xc4cec3);
+                  p.color.set(0xd5dbdf);
                   if (name === "tip") {
                     p.transmission = 0.1;
                     p.transparent = true;
@@ -409,8 +417,8 @@ export function Workbench(props: Props) {
       pellet.position.copy(pp);
       protectedRing.position.copy(pp);
       uncertainty.position.copy(pp);
-      protectedRing.visible = p.showBelief;
-      uncertainty.visible = p.showBelief;
+      protectedRing.visible = p.showExclusion;
+      uncertainty.visible = p.showExclusion;
 
       request();
     }
@@ -456,7 +464,13 @@ export function Workbench(props: Props) {
   }, []);
   useEffect(() => {
     api.current?.update(props);
-  }, [props.world, props.tip, props.cutaway, props.showBelief, props.active]);
+  }, [
+    props.world,
+    props.tip,
+    props.cutaway,
+    props.showExclusion,
+    props.active,
+  ]);
   useEffect(() => {
     api.current?.reset();
   }, [props.reset, props.overview]);

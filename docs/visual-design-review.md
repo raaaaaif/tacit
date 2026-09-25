@@ -1,0 +1,45 @@
+# TACIT visual design rationale
+
+Research and local review: 25 September 2026. This note records the direction implemented and locally checked for the 0.4 publication. The release review records the local conditions and results; the delivery report records production verification. Neither this rationale nor the local checks certify formal accessibility conformance.
+
+## Graphite instrument and light evidence sheet
+
+TACIT's identity comes from its tube assembly, camera observations, decision record and controlled experiments. The final direction combines the independent review's readable light evidence sheet with the external review's bounded graphite specimen field. This separates the explanatory instrument from its operational evidence while retaining warm paper, dark ink, precise rules and the existing IBM Plex Sans/Mono family. One command row precedes the specimen on mobile, and the timeline stays in the specimen column. The camera toolbar moves below the canvas on narrow screens, leaving the tube visible and the controls reachable.
+
+The reference is functional organization: Vitsœ's presentation of the Braun T 1000 illustrates a distinct measurement field and grouped controls. Nature's redesign provides a separate example of grids, legibility and figure-led scientific information. These inform TACIT's arrangement, not borrowed branding or an implication of journal validation. IBM's own typography guidance supports clear alignment, a deliberate scale and comfortable spacing within the already shipped family. [Vitsœ: Good design](https://www.vitsoe.com/us/about/good-design), [Kelly Krause: Nature redesign](https://www.kellykrausedesign.com/project01), [IBM: Type basics](https://www.ibm.com/design/language/typography/type-basics/)
+
+This direction responds to the reviewed interface: important labels were faint, several essential values were very small, and the comparison page gave repeated introductory copy more emphasis than its findings. Nielsen Norman Group describes hierarchy through contrast, scale and grouping. Our application is to give the instrument, current decision and measured comparison first claim on attention, while keeping raw evidence and methods available. That is a design decision for TACIT, not a prescription that every product should look like a laboratory instrument. [NN/G: Visual Hierarchy in UX](https://www.nngroup.com/articles/visual-hierarchy-ux-definition/)
+
+## Specificity and the concern about “AI slop”
+
+NN/G's evaluation of AI prototyping tools found generic visual styles and cases where a familiar pattern emphasized the wrong information. Anthropic's account similarly describes generated interfaces converging on common defaults. Together these support supplying a concrete visual purpose and reviewing the result against real tasks. They do not establish a reliable visual test of authorship. [NN/G: AI Prototyping in Real Design Contexts](https://www.nngroup.com/articles/ai-prototyping/), [Anthropic: Improving frontend design through Skills](https://claude.com/blog/improving-frontend-design-through-skills)
+
+For TACIT, that means fewer repeated slogans, useful figures instead of ornamental charts, and motion tied to the recorded action. The research also considered the appeal of handmade visual styles. NN/G cautions that a welcoming aesthetic can undermine trust when the product does not support its implied qualities. TACIT therefore keeps its AI-assistance disclosure and negative scientific findings; it does not add simulated handwriting, imperfections or decorative texture to suggest unassisted authorship. There is no algorithmic “AI slop” score or promise that a particular palette eliminates recognizable AI patterns. [NN/G: Handmade Designs: The New Trust Signal](https://www.nngroup.com/articles/handmade-designs/)
+
+## Legibility and meaningful color
+
+Contrast checks use WCAG 2.2 thresholds of 4.5:1 for normal text and 3:1 for large text, using specified foreground/background colors. The baseline page-heading secondary color measured 2.704:1 on its background. The revision addresses literal component colors as well as root variables, including light scene labels on the graphite background. Font size, line height and weight also matter: a passing ratio alone does not make miniature text comfortable. The release review records measured contrast scope and exclusions; these checks are not a WCAG conformance audit. [W3C: Contrast Minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+
+Forest marks operations, blue distinguishes recorded quantities, amber marks unresolved or stopped states, and red identifies recorded violations. Labels retain the meaning independently of color. Carbon's guidance separates colors used to encode data from colors used for status; the particular TACIT palette is our application of that distinction. In particular, a stopped episode should not acquire the visual treatment of successful completion. [IBM Carbon: Data Visualization Color Palettes](https://carbondesignsystem.com/data-visualization/color-palettes/)
+
+Primary controls aim for comfortable 40–44 px targets. Smaller controls must satisfy the 24×24 CSS px minimum or an applicable spacing/other exception; zoom is not a substitute for target size. Focus visibility, keyboard paths and dense timeline navigation need separate checks. [W3C: Target Size Minimum](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html)
+
+## Figures carry actual evidence
+
+The paired volume figure uses recorded initial, retained and removed quantities, a shared volume axis, direct numbers and each arm's residual target. Population graphics retain every pair, including unchanged and adverse effects, alongside mean progress and elapsed-time cost. A removed-volume interval derived from stored residual differences requires both sign reversal and reversal of its endpoints. Family filters use the same displayed rows for points, denominators and summaries. These requirements come from TACIT's saved data, not decorative chart conventions.
+
+Figures expose unfinished work as well as progress. Evaluation outcomes remain distinct from controller inputs; a target-volume marker alone does not establish completion. All stopped episodes stay in the summaries, and exploratory intervals do not imply physical validation. The 96 pairs reuse 36 scenes across intervention types, so their 192 arm outcomes are not represented as 192 independent trials.
+
+Presentation lighting and material separation improve the 3D assembly's readability while the scene continues to identify evaluation truth explicitly. The synthetic camera display's CSS filter was removed, preserving the distinction between styled explanatory rendering and recorded pixel evidence. Scientific optics, geometry and all 27 frozen study-source hashes remain unchanged. The new CI source-hash check helps keep presentation changes from silently invalidating the published scientific snapshot.
+
+## Local checks and publication boundary
+
+- Run, Investigate and Design were inspected at 320, 390, 768 and 1440 CSS px widths, with expanded receipts and 200% zoom included. The graphite composition was additionally checked at 1024 and 1920 px; at 390 × 844 the main command is visible before scrolling.
+- Decision text, candidate checks, threshold plots, paired volume balances and interval figures expose their values and units alongside their color encoding.
+- Keyboard scrolling of the evidence table no longer advances the trace. The local review also covered focus, reduced motion and the isolated WebGL fallback.
+- The revised local flow covers run → receipt → comparison → export/import, intervention-preserving reruns and transactional rejection of malformed evidence.
+- A keyboard-only pass completed Run, receipt investigation and paired comparison, plus dialog focus return. A delayed-file browser check preserved the last requested import, and editing the scenario removed the stale pair. The final source suite passed 45 tests.
+
+Chrome 154 covered the final local interface, and a separate WebKit 26.6 engine pass checked core flows and narrow layouts without errors or warnings. WebKit automation is not native Safari. Native Safari 27 observations come from the earlier 0.4 interface before the graphite revision and do not establish final native Safari coverage. A dedicated screen-reader pass was not performed. The final three-mode computed-style contrast scan found no failures within its documented exclusions. Full observations and numerical limitations are recorded in `docs/release-review.md`; the checks are not formal accessibility certification. The delivery report records live-site verification, final screenshots and the deployed commit.
+
+The acceptance question remains practical: can a reader identify the action, its stopping reason, the changed condition between paired arms and what remains unmeasured? The design makes those answers visible without implying that a stopped simulation completed the laboratory task.

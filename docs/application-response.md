@@ -10,4 +10,4 @@ That combination of wet-lab context, geometric reasoning and explicit uncertaint
 
 Development used substantial AI assistance for implementation, refinement, testing and documentation. Raaif should review personal-experience and authorship wording before using this draft. No application was submitted.
 
-The existing demo at https://tacit-workbench.pages.dev and repository at https://github.com/raaaaaif/tacit describe the previously published work. This 0.4 refinement is a local branch until separately published; do not send those links as evidence of the new release without updating them. The three-minute recording script is in `docs/demo-script.md`.
+Release links: [TACIT workbench](https://tacit-workbench.pages.dev), [source repository](https://github.com/raaaaaif/tacit), and [model and evidence](https://tacit-workbench.pages.dev/docs/methods.html). The release is v0.4.0, with policy `readiness-policy-2` and study `readiness-study-2`. Check the delivery report for the deployed commit and production verification before using these links in an application. The three-minute recording script is in `docs/demo-script.md`.

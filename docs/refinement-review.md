@@ -1,6 +1,6 @@
 # TACIT refinement audit and acceptance map
 
-The supplied handoffs and standalone reviewer were reviewed as design evidence. The reference kit was not substituted for the original application. Changes are implemented in the original React/TypeScript kernel, worker and interface. The original handoff files remain preserved. No site, repository branch or application response was published by this task.
+The supplied handoffs and standalone reviewer were reviewed as design evidence. The reference kit was not substituted for the original application. Changes are implemented in the original React/TypeScript kernel, worker and interface. The original handoff files remain preserved privately. The 0.4 release uses the existing repository and Cloudflare Pages site; publication checks are recorded in the delivery report. No application response was submitted.
 
 ## Geometry and physical contract
 

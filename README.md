@@ -4,9 +4,9 @@ An execution-readiness workbench for one laboratory handling step: bulk wash rem
 
 Built by Raaif Bokhari as an independent project exploring scientific execution data and physical AI. It is a synthetic research workbench, not a biological validation study or a robot deployment.
 
-**Local refinement: v0.4.0.** The public links below point to the earlier published version until a separate deployment.
+**Release: v0.4.0.** Kernel `tacit-0.4.0` · geometry `nominal-assembly-02` · policy `readiness-policy-2`. The release review records local verification; the delivery report records the deployed commit and public verification.
 
-[Open the published workbench](https://tacit-workbench.pages.dev) · [Model and evidence](https://tacit-workbench.pages.dev/docs/methods.html) · [Release review](docs/release-review.md)
+[Open TACIT](https://tacit-workbench.pages.dev) · [Model and evidence](https://tacit-workbench.pages.dev/docs/methods.html) · [Release review](docs/release-review.md) · [Visual design rationale](docs/visual-design-review.md)
 
 ![TACIT execution-readiness workbench](docs/workbench-0.4.png)
 
@@ -24,14 +24,15 @@ Open the printed localhost address. No login, API key, paid service or GPU compu
 ## Use it
 
 - **Run:** choose a scenario and controller, then run. Space pauses or resumes; R resets the camera.
-- **Investigate:** find the first blocker, inspect original check values and inputs, step through decisions, and export/import a hashed evidence packet with exact camera pixels. Legacy traces remain data-only evidence.
-- **Design:** rerun a matched pair changing history access, view availability or policy. Inspect either arm and export both. Current exploratory results retain all stops and failures; historical results are separate. Research geometry and older search tools are secondary.
+- **Investigate:** find the first blocker, inspect original inputs, candidate checks and threshold plots, step through decisions, and export/import a hashed evidence packet with exact camera pixels. Legacy traces remain data-only evidence.
+- **Design:** rerun a matched pair changing history access, view availability or policy. Read the paired volume balance and population effect intervals, inspect either arm and export both. Current exploratory results retain all stops and failures; historical results are separate. Research geometry and older search tools are secondary.
 
 The opening scenario is ready to run. The additional scenarios expose changed setup and missing context. A deliberate stop is different from a completed task. The 10° surface-reference configuration is currently unsupported because one reference calculation failed to converge.
 
 ## Reproduce checks
 
 ```sh
+npx tsx scripts/verify-study-source.ts
 npm test
 npm run build
 npm run check:budget
