@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -124,6 +124,11 @@ export default function App() {
   const worker = useRef<Worker | null>(null),
     fileInput = useRef<HTMLInputElement>(null),
     modal = useRef<HTMLElement>(null);
+  const modalTrigger = useRef<HTMLButtonElement | null>(null);
+  const openAbout = (event: MouseEvent<HTMLButtonElement>) => {
+    modalTrigger.current = event.currentTarget;
+    setAbout(true);
+  };
   const config = useMemo(() => {
     if (importedRun) return importedRun.trace.scenario;
     const s = scenario(scenarioId, seed);
@@ -240,7 +245,10 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!about) return;
-    const previous = document.activeElement as HTMLElement | null;
+    // Safari does not focus buttons on pointer activation. Keep the actual
+    // opener so closing the dialog restores the user's place reliably.
+    const previous =
+      modalTrigger.current ?? (document.activeElement as HTMLElement | null);
     setPlaying(false);
     const focusables = () =>
       Array.from(
@@ -255,21 +263,30 @@ export default function App() {
         setAbout(false);
       }
       if (e.key === "Tab") {
-        const all = focusables(),
-          first = all[0],
-          last = all.at(-1);
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
+        // Safari's default keyboard preference can skip buttons and links.
+        // Own every step, including recovery when focus is outside the dialog.
+        e.preventDefault();
+        const all = focusables();
+        const current = all.indexOf(document.activeElement as HTMLElement);
+        const next =
+          current < 0
+            ? e.shiftKey
+              ? all.length - 1
+              : 0
+            : (current + (e.shiftKey ? -1 : 1) + all.length) % all.length;
+        all[next]?.focus();
+      }
+    };
+    const containFocus = (event: FocusEvent) => {
+      if (!modal.current?.contains(event.target as Node)) {
+        focusables()[0]?.focus({ preventScroll: true });
       }
     };
     document.addEventListener("keydown", trap);
+    document.addEventListener("focusin", containFocus);
     return () => {
       document.removeEventListener("keydown", trap);
+      document.removeEventListener("focusin", containFocus);
       previous?.focus({ preventScroll: true });
     };
   }, [about]);
@@ -560,7 +577,7 @@ export default function App() {
           <button
             className="icon-button"
             aria-label="About TACIT"
-            onClick={() => setAbout(true)}
+            onClick={openAbout}
           >
             <Info size={18} />
           </button>
@@ -576,7 +593,7 @@ export default function App() {
               Remove the wash. <span>Inspect the decision.</span>
             </h1>
           </div>
-          <button className="text-button" onClick={() => setAbout(true)}>
+          <button className="text-button" onClick={openAbout}>
             Why this task <ArrowUpRight size={15} />
           </button>
         </div>
@@ -1489,7 +1506,7 @@ export default function App() {
             project by Raaif Bokhari
           </span>
           <div>
-            <button onClick={() => setAbout(true)}>
+            <button onClick={openAbout}>
               Model & methods
               <ArrowUpRight size={13} />
             </button>
