@@ -23,7 +23,9 @@ Open the printed localhost address. No login, API key, paid service or GPU compu
 
 ## Use it
 
-- **Run:** choose a scenario and controller, then run. Space pauses or resumes; R resets the camera.
+[Start here: a first experiment and plain-English guide](docs/start-here.md).
+
+- **Run:** choose a scenario and controller, then click **Run simulation** to compute an attempt. The timeline's **Replay/Pause** controls revisit that record. Space controls replay when focus is outside buttons and fields; R resets the camera.
 - **Investigate:** find the first blocker, inspect original inputs, candidate checks and threshold plots, step through decisions, and export/import a hashed evidence packet with exact camera pixels. Legacy traces remain data-only evidence.
 - **Design:** rerun a matched pair changing history access, view availability or policy. Read the paired volume balance and population effect intervals, inspect either arm and export both. Current exploratory results retain all stops and failures; historical results are separate. Research geometry and older search tools are secondary.
 

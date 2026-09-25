@@ -45,7 +45,11 @@ import { playbackState, packetAt, PARKED_TIP } from "./model/playback";
 import { CameraFrame } from "./components/CameraFrame";
 import { EvidenceReport } from "./components/EvidenceReport";
 import { SearchResults } from "./components/SearchResults";
-import type { SearchResult, Candidate } from "./model/optimization";
+import type { Candidate } from "./model/optimization";
+import {
+  searchForContext,
+  type ContextualSearchResult,
+} from "./ui/searchContext";
 import {
   SCENARIOS,
   CONTROLLERS,
@@ -63,7 +67,17 @@ import type {
   Vec3,
   ExperimentReport,
   PolicySpec,
+  ScenarioSpec,
 } from "./model/types";
+const DISPLAY_CONTROLLERS = [
+  ...CONTROLLERS,
+  {
+    id: "stop" as const,
+    label: "Always stop · diagnostic",
+    short: "Always stop",
+    description: "Diagnostic baseline: stops without withdrawing liquid.",
+  },
+];
 type Mode = "run" | "investigate" | "design";
 function save(name: string, value: unknown, type = "application/json") {
   const blob = new Blob(
@@ -102,15 +116,25 @@ export default function App() {
     [exporting, setExporting] = useState(false),
     [searching, setSearching] = useState(false),
     [searchEvaluations, setSearchEvaluations] = useState(0),
-    [searchResult, setSearchResult] = useState<SearchResult | null>(null),
+    [searchResult, setSearchResult] = useState<ContextualSearchResult | null>(
+      null,
+    ),
     [customPolicy, setCustomPolicy] = useState<PolicySpec | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [comparing, setComparing] = useState(false);
   const [geometryOpen, setGeometryOpen] = useState(false);
-  // A collapsed specimen has no visible replay controls or time context.
+  const replayVisible = !about && (mode !== "design" || geometryOpen);
+  // Consult current visibility when an asynchronous computation finishes.
+  const replayVisibleRef = useRef(replayVisible);
+  replayVisibleRef.current = replayVisible;
   useEffect(() => {
-    if (mode === "design" && !geometryOpen) setPlaying(false);
-  }, [mode, geometryOpen]);
+    if (!replayVisible) setPlaying(false);
+  }, [replayVisible]);
+  const [preparedScenario, setPreparedScenario] = useState<ScenarioSpec | null>(
+    null,
+  );
+  const [preparedAccess, setPreparedAccess] =
+    useState<RunTrace["intervention"]>();
   const jobId = useRef(0);
   const importRequest = useRef(createImportRequest());
   const [importedRun, setImportedRun] = useState<{
@@ -119,8 +143,6 @@ export default function App() {
   } | null>(null);
   const selectedPolicy =
     customPolicy?.controller === controller ? customPolicy : policy(controller);
-  const displayedSearch =
-    searchResult?.best.policy.controller === controller ? searchResult : null;
   const worker = useRef<Worker | null>(null),
     fileInput = useRef<HTMLInputElement>(null),
     modal = useRef<HTMLElement>(null);
@@ -130,13 +152,26 @@ export default function App() {
     setAbout(true);
   };
   const config = useMemo(() => {
-    if (importedRun) return importedRun.trace.scenario;
+    if (preparedScenario) return preparedScenario;
     const s = scenario(scenarioId, seed);
     s.fixture.tilt = tilt;
     s.fixture.indexed = indexed;
     return s;
-  }, [scenarioId, seed, tilt, indexed, importedRun]);
-  const initialEstimate = useMemo(() => initialBelief(config), [config]);
+  }, [scenarioId, seed, tilt, indexed, preparedScenario]);
+  const displayedSearch = searchForContext(
+    searchResult,
+    config,
+    selectedPolicy,
+  );
+  const initialEstimate = useMemo(
+    () =>
+      initialBelief({
+        ...config,
+        historyKnown:
+          config.historyKnown && preparedAccess?.history !== "withheld",
+      }),
+    [config, preparedAccess],
+  );
   const initial = useMemo(() => worldFromScenario(config), [config]);
   function createWorker() {
     worker.current?.terminate();
@@ -156,7 +191,7 @@ export default function App() {
       if (m.type === "progress") setProgress(m.progress);
       if (m.type === "search-evaluation") setSearchEvaluations(m.completed);
       if (m.type === "search-done") {
-        setSearchResult(m.result);
+        setSearchResult({ ...m.result, trainingScenario: config });
         setSearching(false);
         setBusy(false);
       }
@@ -167,7 +202,8 @@ export default function App() {
         setSearching(false);
         setTime(0);
         setPlaying(
-          !document.hidden &&
+          replayVisibleRef.current &&
+            !document.hidden &&
             !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         );
       }
@@ -209,7 +245,7 @@ export default function App() {
     setSearching(false);
     setComparing(false);
     return () => w.terminate();
-  }, [config]);
+  }, [config, importedRun]);
   useEffect(() => {
     fetch("/data/experiment.json")
       .then((r) => (r.ok ? r.json() : null))
@@ -217,7 +253,7 @@ export default function App() {
       .catch(() => {});
   }, []);
   useEffect(() => {
-    if (!playing || !trace || document.hidden) return;
+    if (!playing || !trace || document.hidden || !replayVisible) return;
     let frame = 0,
       last = performance.now();
     function tick(now: number) {
@@ -235,7 +271,7 @@ export default function App() {
     }
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, trace, speed]);
+  }, [playing, trace, speed, replayVisible]);
   useEffect(() => {
     const hidden = () => {
       if (document.hidden) setPlaying(false);
@@ -355,7 +391,7 @@ export default function App() {
       jobId: ++jobId.current,
       scenario: config,
       policy: selectedPolicy,
-      access: trace?.intervention,
+      access: preparedAccess,
     });
   };
   function cancel() {
@@ -395,6 +431,8 @@ export default function App() {
     setIndexed(t.scenario.fixture.indexed);
     setController(t.policy.controller);
     setCustomPolicy(t.policy);
+    setPreparedScenario(t.scenario);
+    setPreparedAccess(t.intervention);
     setImportedRun({ trace: t, packets: a.packets });
     setMode("investigate");
   }
@@ -437,19 +475,23 @@ export default function App() {
     setCustomPolicy(c.policy);
     setController(c.policy.controller);
     setTilt(c.tilt);
+    setPreparedScenario({
+      ...config,
+      fixture: { ...config.fixture, tilt: c.tilt },
+    });
     setTrace(null);
     setPackets([]);
     setTime(0);
     setPlaying(false);
   }
   function toggleReplay() {
-    if (!trace || busy) return;
+    if (!trace || busy || !replayVisible) return;
     if (finished) setTime(0);
     setPlaying((value) => !value);
   }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (about) return;
+      if (!replayVisible) return;
       if ((e.target as HTMLElement).matches("input,select,textarea,button"))
         return;
       if ((e.target as HTMLElement).closest(".evidence-scroll")) return;
@@ -478,7 +520,15 @@ export default function App() {
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [trace, config, controller, busy, finished, selectedPolicy, about]);
+  }, [
+    trace,
+    config,
+    controller,
+    busy,
+    finished,
+    selectedPolicy,
+    replayVisible,
+  ]);
   function exportCSV() {
     if (!trace) return;
     save(
@@ -533,6 +583,8 @@ export default function App() {
         setController(t.policy.controller);
         setCustomPolicy(t.policy);
         setComparison(bundle.comparison);
+        setPreparedScenario(t.scenario);
+        setPreparedAccess(t.intervention);
         setImportedRun(bundle);
         setMode("investigate");
       },
@@ -593,9 +645,14 @@ export default function App() {
               Remove the wash. <span>Inspect the decision.</span>
             </h1>
           </div>
-          <button className="text-button" onClick={openAbout}>
-            Why this task <ArrowUpRight size={15} />
-          </button>
+          <a
+            className="text-button"
+            href="/docs/start-here.html"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Start here <ArrowUpRight size={15} />
+          </a>
         </div>
         <div className="readiness-strip">
           <span>
@@ -646,6 +703,8 @@ export default function App() {
                   onChange={(e) => {
                     invalidatePreparedContext();
                     setImportedRun(null);
+                    setPreparedScenario(null);
+                    setPreparedAccess(undefined);
                     setScenario(e.target.value as ScenarioId);
                     setIndexed(e.target.value !== "missing");
                   }}
@@ -659,18 +718,19 @@ export default function App() {
                 <ChevronDown size={16} />
               </div>
               <p>
-                {trace?.intervention &&
-                (trace.intervention.history === "withheld" ||
-                  trace.intervention.views.length < 2)
-                  ? `${sInfo.name}. Replaying an evidence intervention; controller access is listed below.`
+                {preparedAccess &&
+                (preparedAccess.history === "withheld" ||
+                  preparedAccess.views.length < 2)
+                  ? `${sInfo.name}. Using an evidence intervention; controller access is listed below.`
                   : sInfo.description}
               </p>
             </div>
             <div className="run-command-action">
               <span>
                 {
-                  CONTROLLERS.find((c) => c.id === selectedPolicy.controller)
-                    ?.label
+                  DISPLAY_CONTROLLERS.find(
+                    (c) => c.id === selectedPolicy.controller,
+                  )?.label
                 }
               </span>
               <div className="run-controls">
@@ -1088,7 +1148,7 @@ export default function App() {
                         setTime(0);
                       }}
                     >
-                      {CONTROLLERS.map((c) => (
+                      {DISPLAY_CONTROLLERS.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.label}
                         </option>
@@ -1100,7 +1160,7 @@ export default function App() {
                     <ShieldCheck size={16} />
                     <span>
                       {
-                        CONTROLLERS.find((c) => c.id === controller)!
+                        DISPLAY_CONTROLLERS.find((c) => c.id === controller)!
                           .description
                       }
                     </span>
@@ -1137,13 +1197,13 @@ export default function App() {
                       : controller === "nominal"
                         ? "Procedure assumptions · no camera update"
                         : config.historyKnown &&
-                            trace?.intervention?.history !== "withheld"
+                            preparedAccess?.history !== "withheld"
                           ? "Handling record + synthetic cameras"
                           : "Synthetic cameras · history absent"}
                   </b>
                   <small>
-                    {trace?.intervention &&
-                      `Camera access: ${trace.intervention.views.length ? trace.intervention.views.join(" + ") : "none"}. `}
+                    {preparedAccess &&
+                      `Camera access: ${preparedAccess.views.length ? preparedAccess.views.join(" + ") : "none"}. `}
                     Target: {selectedPolicy.residualTarget.toFixed(0)} µL
                     remaining. Final pellet-adjacent removal is outside this
                     model.
@@ -1158,8 +1218,7 @@ export default function App() {
                   <CameraFrame
                     now={time}
                     enabled={
-                      !trace?.intervention ||
-                      trace.intervention.views.includes("side")
+                      !preparedAccess || preparedAccess.views.includes("side")
                     }
                     label="SIDE"
                     packet={activePacket("side")}
@@ -1172,8 +1231,8 @@ export default function App() {
                   <CameraFrame
                     now={time}
                     enabled={
-                      !trace?.intervention ||
-                      trace.intervention.views.includes("overhead")
+                      !preparedAccess ||
+                      preparedAccess.views.includes("overhead")
                     }
                     label="OVERHEAD"
                     packet={activePacket("overhead")}
@@ -1252,8 +1311,8 @@ export default function App() {
                         packet={activePacket("side")}
                         now={time}
                         enabled={
-                          !trace?.intervention ||
-                          trace.intervention.views.includes("side")
+                          !preparedAccess ||
+                          preparedAccess.views.includes("side")
                         }
                       />
                       <CameraFrame
@@ -1261,8 +1320,8 @@ export default function App() {
                         packet={activePacket("overhead")}
                         now={time}
                         enabled={
-                          !trace?.intervention ||
-                          trace.intervention.views.includes("overhead")
+                          !preparedAccess ||
+                          preparedAccess.views.includes("overhead")
                         }
                       />
                     </div>
@@ -1292,7 +1351,7 @@ export default function App() {
                     }}
                   >
                     <Play size={16} />
-                    Run a procedure
+                    Run a simulation
                     <ArrowRight size={16} />
                   </button>
                 )}
@@ -1341,6 +1400,10 @@ export default function App() {
                             invalidatePreparedContext();
                             setImportedRun(null);
                             setTilt(v);
+                            setPreparedScenario({
+                              ...config,
+                              fixture: { ...config.fixture, tilt: v },
+                            });
                           }}
                           className={tilt === v ? "selected" : ""}
                         >
@@ -1365,6 +1428,13 @@ export default function App() {
                         invalidatePreparedContext();
                         setImportedRun(null);
                         setIndexed(e.target.checked);
+                        setPreparedScenario({
+                          ...config,
+                          fixture: {
+                            ...config.fixture,
+                            indexed: e.target.checked,
+                          },
+                        });
                       }}
                     />
                     <span className="toggle" />
@@ -1436,6 +1506,7 @@ export default function App() {
                   {displayedSearch && (
                     <SearchResults
                       result={displayedSearch}
+                      contextLabel={`${SCENARIOS.find((s) => s.id === displayedSearch.trainingScenario.id)?.name} · marker ${displayedSearch.trainingScenario.fixture.indexed ? "on" : "off"} · default evidence access`}
                       disabled={busy}
                       applied={
                         customPolicy === displayedSearch.best.policy &&
@@ -1460,6 +1531,13 @@ export default function App() {
                     onChange={(e) => (
                       invalidatePreparedContext(),
                       setImportedRun(null),
+                      setPreparedScenario({
+                        ...config,
+                        seed: Math.min(
+                          4294967295,
+                          Math.max(1, Math.floor(Number(e.target.value)) || 1),
+                        ),
+                      }),
                       setSeed(
                         Math.min(
                           4294967295,

@@ -2,12 +2,14 @@ import type { SearchResult, Candidate } from "../model/optimization";
 import { Check, Download } from "lucide-react";
 export function SearchResults({
   result,
+  contextLabel,
   onApply,
   onExport,
   applied = false,
   disabled = false,
 }: {
   result: SearchResult;
+  contextLabel: string;
   onApply: (c: Candidate) => void;
   onExport: () => void;
   applied?: boolean;
@@ -61,10 +63,11 @@ export function SearchResults({
         </text>
       </svg>
       <p className="search-method">
-        Training cases only · seed {result.seed}. Test the selected
-        configuration on a fresh scene before drawing a conclusion.
+        {contextLabel}. Training cases only · search seed {result.seed}. Test
+        the selected configuration on a fresh scene before drawing a conclusion.
       </p>
       <p className="search-method">
+        Target {result.best.policy.residualTarget.toFixed(0)} µL remaining.
         Withdrawals up to {result.best.policy.chunk.toFixed(0)} µL · immersion{" "}
         {result.best.policy.surfaceDepth.toFixed(1)} mm · clearance{" "}
         {result.best.policy.margin.toFixed(1)} mm · observe every{" "}
